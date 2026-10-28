@@ -23,6 +23,11 @@ export default function App() {
   const loadMessage = async () => {
     try {
       const response = await fetch(URL + 'messages');
+
+      if (!response.ok) {
+        throw new Error('Failed to load messages');
+      }
+
       const res = await response.json();
       setMessages(res);
     } catch (error) {
@@ -32,6 +37,7 @@ export default function App() {
 
   useEffect(() => {
     loadMessage();
+
     const interval = setInterval(loadMessage, 2000);
 
     return () => clearInterval(interval);
@@ -57,7 +63,7 @@ export default function App() {
       }
 
       setText('');
-      loadMessage();
+      await loadMessage();
     } catch (error) {
       console.log('Error sending message:', error);
     }
@@ -105,7 +111,10 @@ export default function App() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={styles.container}
+      edges={['top', 'left', 'right']}
+    >
       <StatusBar style="light" />
 
       <KeyboardAvoidingView
@@ -120,9 +129,12 @@ export default function App() {
 
           <View style={styles.headerInfo}>
             <Text style={styles.title}>Scalar</Text>
+
             <View style={styles.statusRow}>
               <View style={styles.onlineDot} />
-              <Text style={styles.statusText}>Group conversation</Text>
+              <Text style={styles.statusText}>
+                Group conversation
+              </Text>
             </View>
           </View>
 
@@ -143,6 +155,7 @@ export default function App() {
             renderItem={renderItem}
             contentContainerStyle={styles.messagesContent}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           />
         </View>
 
