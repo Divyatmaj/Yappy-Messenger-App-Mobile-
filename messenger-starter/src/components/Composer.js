@@ -3,7 +3,14 @@ import { colors, radius } from '../theme';
 
 const MAX_LENGTH = 2000;
 
-export default function Composer({ value, onChangeText, onSend, placeholder }) {
+export default function Composer({
+  value,
+  onChangeText,
+  onSend,
+  placeholder,
+  me,
+  onChangeName,
+}) {
   const canSend = value.trim().length > 0;
   const nearLimit = value.length > MAX_LENGTH - 200;
 
@@ -35,11 +42,30 @@ export default function Composer({ value, onChangeText, onSend, placeholder }) {
         </Pressable>
       </View>
 
-      {nearLimit && (
-        <Text style={styles.counter}>
-          {value.length}/{MAX_LENGTH}
-        </Text>
-      )}
+      <View style={styles.footer}>
+        {me ? (
+          <Text style={styles.identity} numberOfLines={1}>
+            Chatting as <Text style={styles.identityName}>{me}</Text>
+            {onChangeName && (
+              <Text
+                style={styles.changeLink}
+                onPress={onChangeName}
+                accessibilityRole="link"
+              >
+                {'  ·  Change'}
+              </Text>
+            )}
+          </Text>
+        ) : (
+          <View />
+        )}
+
+        {nearLimit && (
+          <Text style={styles.counter}>
+            {value.length}/{MAX_LENGTH}
+          </Text>
+        )}
+      </View>
     </View>
   );
 }
@@ -94,11 +120,29 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginTop: -2,
   },
-  counter: {
-    alignSelf: 'flex-end',
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 7,
+    paddingHorizontal: 8,
+  },
+  identity: {
+    flex: 1,
     color: colors.textMuted,
     fontSize: 11,
-    marginTop: 4,
-    marginRight: 8,
+  },
+  identityName: {
+    color: colors.textStrong,
+    fontWeight: '600',
+  },
+  changeLink: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  counter: {
+    color: colors.textMuted,
+    fontSize: 11,
+    marginLeft: 8,
   },
 });

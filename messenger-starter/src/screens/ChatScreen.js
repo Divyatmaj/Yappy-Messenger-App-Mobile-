@@ -19,7 +19,7 @@ import { colors } from '../theme';
 const POLL_INTERVAL_MS = 2000;
 const GROUP_NAME = 'Scalar';
 
-export default function ChatScreen({ me }) {
+export default function ChatScreen({ me, onChangeName }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
   const listRef = useRef(null);
@@ -113,6 +113,8 @@ export default function ChatScreen({ me }) {
             onChangeText={setText}
             onSend={sendMessage}
             placeholder={`Message ${GROUP_NAME}...`}
+            me={me}
+            onChangeName={onChangeName}
           />
         </View>
       </KeyboardAvoidingView>
