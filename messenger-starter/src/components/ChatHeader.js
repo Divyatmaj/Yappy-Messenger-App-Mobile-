@@ -1,7 +1,7 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../theme';
 
-export default function ChatHeader({ title, subtitle }) {
+export default function ChatHeader({ title, subtitle, onSearchPress }) {
   return (
     <View style={styles.header}>
       <View style={styles.icon}>
@@ -15,6 +15,16 @@ export default function ChatHeader({ title, subtitle }) {
           <Text style={styles.statusText}>{subtitle}</Text>
         </View>
       </View>
+
+      <Pressable
+        style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+        onPress={onSearchPress}
+        hitSlop={6}
+        accessibilityRole="button"
+        accessibilityLabel="Search messages"
+      >
+        <Text style={styles.searchIcon}>🔍</Text>
+      </Pressable>
 
       <View style={styles.menu}>
         <Text style={styles.menuText}>•••</Text>
@@ -75,6 +85,19 @@ const styles = StyleSheet.create({
   statusText: {
     color: colors.headerSubtle,
     fontSize: 12,
+  },
+  action: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pressed: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  searchIcon: {
+    fontSize: 17,
   },
   menu: {
     paddingHorizontal: 8,

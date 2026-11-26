@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Avatar from './Avatar';
+import HighlightedText from './HighlightedText';
 import { colors, colorForUser, radius } from '../theme';
 
 const AVATAR_SIZE = 32;
@@ -16,6 +17,8 @@ export default function MessageBubble({
   isLastInGroup,
   onRetry,
   onDiscard,
+  query = '',
+  isActiveMatch = false,
 }) {
   const { status } = message;
   const failed = status === 'failed';
@@ -46,19 +49,24 @@ export default function MessageBubble({
             status === 'sending' && styles.sending,
             failed && styles.failed,
             !isMine && !isLastInGroup && styles.othersContinued,
+            isActiveMatch && styles.activeMatch,
           ]}
         >
           {!isMine && isFirstInGroup && (
-            <Text
+            <HighlightedText
+              text={message.user}
+              query={query}
               style={[styles.sender, { color: colorForUser(message.user).fg }]}
-            >
-              {message.user}
-            </Text>
+              highlightStyle={styles.highlight}
+            />
           )}
 
-          <Text style={[styles.text, isMine && styles.myText]}>
-            {message.text}
-          </Text>
+          <HighlightedText
+            text={message.text}
+            query={query}
+            style={[styles.text, isMine && styles.myText]}
+            highlightStyle={styles.highlight}
+          />
         </View>
       </View>
 
@@ -123,6 +131,14 @@ const styles = StyleSheet.create({
   },
   othersContinued: {
     borderBottomLeftRadius: radius.bubble,
+  },
+  activeMatch: {
+    borderWidth: 2,
+    borderColor: '#F5B700',
+  },
+  highlight: {
+    backgroundColor: '#FFE066',
+    color: '#30364B',
   },
   sending: {
     opacity: 0.6,
