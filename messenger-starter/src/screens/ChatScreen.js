@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -8,48 +8,33 @@ import {
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 
 import ChatHeader from '../components/ChatHeader';
+import ChatPlaceholder from '../components/ChatPlaceholder';
 import Composer from '../components/Composer';
+import ConnectionBanner from '../components/ConnectionBanner';
 import MessageBubble from '../components/MessageBubble';
-import { fetchMessages, messageKey, postMessage } from '../api';
+import useMessages from '../hooks/useMessages';
+import { messageKey } from '../api';
 import { colors } from '../theme';
 
-const POLL_INTERVAL_MS = 2000;
 const GROUP_NAME = 'Scalar';
 
 export default function ChatScreen({ me, onChangeName }) {
-  const [messages, setMessages] = useState([]);
+  const { messages, loaded, online, send, retry, discard, refresh } =
+    useMessages(me);
   const [text, setText] = useState('');
   const listRef = useRef(null);
   const insets = useSafeAreaInsets();
 
-  const loadMessages = useCallback(async () => {
-    try {
-      setMessages(await fetchMessages());
-    } catch (error) {
-      console.log('Error loading messages:', error);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadMessages();
-    const interval = setInterval(loadMessages, POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [loadMessages]);
-
-  const sendMessage = async () => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
-
-    try {
-      await postMessage(me, trimmed);
-      setText('');
-      await loadMessages();
-    } catch (error) {
-      console.log('Error sending message:', error);
-    }
+  const sendMessage = () => {
+    if (!text.trim()) return;
+    send(text);
+    setText('');
   };
 
   // Keep the newest message in view when new ones arrive.
@@ -57,7 +42,7 @@ export default function ChatScreen({ me, onChangeName }) {
   useEffect(() => {
     if (messages.length > previousCount.current) {
       requestAnimationFrame(() =>
-        listRef.current?.scrollToEnd({ animated: previousCount.current > 0 })
+        listRef.current?.scrollToEnd({ animated: previousCount.current > 0 }),
       );
     }
     previousCount.current = messages.length;
@@ -74,6 +59,8 @@ export default function ChatScreen({ me, onChangeName }) {
         isMine={item.user === me}
         isFirstInGroup={!prev || prev.user !== item.user}
         isLastInGroup={!next || next.user !== item.user}
+        onRetry={() => retry(item.localId)}
+        onDiscard={() => discard(item.localId)}
       />
     );
   };
@@ -93,21 +80,35 @@ export default function ChatScreen({ me, onChangeName }) {
           } · Group conversation`}
         />
 
+        <ConnectionBanner visible={!online} onRetry={refresh} />
+
         <FlatList
           ref={listRef}
           style={styles.flex}
           data={messages}
-          keyExtractor={messageKey}
+          keyExtractor={(item, index) =>
+            item.localId ?? messageKey(item, index)
+          }
           renderItem={renderItem}
           ListHeaderComponent={
-            <Text style={styles.dateLabel}>MESSAGES</Text>
+            messages.length > 0 ? (
+              <Text style={styles.dateLabel}>MESSAGES</Text>
+            ) : null
+          }
+          ListEmptyComponent={
+            <ChatPlaceholder loading={!loaded} groupName={GROUP_NAME} />
           }
           contentContainerStyle={styles.messagesContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         />
 
-        <View style={{ paddingBottom: insets.bottom, backgroundColor: colors.surface }}>
+        <View
+          style={{
+            paddingBottom: insets.bottom,
+            backgroundColor: colors.surface,
+          }}
+        >
           <Composer
             value={text}
             onChangeText={setText}
@@ -141,6 +142,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   messagesContent: {
+    flexGrow: 1,
     paddingHorizontal: 14,
     paddingTop: 14,
     paddingBottom: 14,

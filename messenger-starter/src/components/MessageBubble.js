@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Avatar from './Avatar';
 import { colors, colorForUser, radius } from '../theme';
 
@@ -14,44 +14,69 @@ export default function MessageBubble({
   isMine,
   isFirstInGroup,
   isLastInGroup,
+  onRetry,
+  onDiscard,
 }) {
-  return (
-    <View
-      style={[
-        styles.row,
-        isMine ? styles.myRow : styles.otherRow,
-        isFirstInGroup ? styles.groupStart : styles.groupContinue,
-      ]}
-    >
-      {!isMine &&
-        (isLastInGroup ? (
-          <View style={styles.avatarSlot}>
-            <Avatar name={message.user} size={AVATAR_SIZE} />
-          </View>
-        ) : (
-          <View style={styles.avatarSlot} />
-        ))}
+  const { status } = message;
+  const failed = status === 'failed';
 
+  return (
+    <View>
       <View
         style={[
-          styles.bubble,
-          isMine ? styles.mine : styles.others,
-          isMine && !isLastInGroup && styles.mineContinued,
-          !isMine && !isLastInGroup && styles.othersContinued,
+          styles.row,
+          isMine ? styles.myRow : styles.otherRow,
+          isFirstInGroup ? styles.groupStart : styles.groupContinue,
         ]}
       >
-        {!isMine && isFirstInGroup && (
-          <Text
-            style={[styles.sender, { color: colorForUser(message.user).fg }]}
-          >
-            {message.user}
-          </Text>
-        )}
+        {!isMine &&
+          (isLastInGroup ? (
+            <View style={styles.avatarSlot}>
+              <Avatar name={message.user} size={AVATAR_SIZE} />
+            </View>
+          ) : (
+            <View style={styles.avatarSlot} />
+          ))}
 
-        <Text style={[styles.text, isMine && styles.myText]}>
-          {message.text}
-        </Text>
+        <View
+          style={[
+            styles.bubble,
+            isMine ? styles.mine : styles.others,
+            isMine && !isLastInGroup && styles.mineContinued,
+            status === 'sending' && styles.sending,
+            failed && styles.failed,
+            !isMine && !isLastInGroup && styles.othersContinued,
+          ]}
+        >
+          {!isMine && isFirstInGroup && (
+            <Text
+              style={[styles.sender, { color: colorForUser(message.user).fg }]}
+            >
+              {message.user}
+            </Text>
+          )}
+
+          <Text style={[styles.text, isMine && styles.myText]}>
+            {message.text}
+          </Text>
+        </View>
       </View>
+
+      {status === 'sending' && <Text style={styles.statusText}>Sending…</Text>}
+      {failed && (
+        <View style={styles.failedRow}>
+          <Text style={[styles.statusText, styles.failedText]}>
+            Not sent ·{' '}
+          </Text>
+          <Pressable onPress={onRetry} hitSlop={6}>
+            <Text style={[styles.statusText, styles.action]}>Retry</Text>
+          </Pressable>
+          <Text style={styles.statusText}> · </Text>
+          <Pressable onPress={onDiscard} hitSlop={6}>
+            <Text style={[styles.statusText, styles.action]}>Delete</Text>
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 }
@@ -98,6 +123,33 @@ const styles = StyleSheet.create({
   },
   othersContinued: {
     borderBottomLeftRadius: radius.bubble,
+  },
+  sending: {
+    opacity: 0.6,
+  },
+  failed: {
+    backgroundColor: '#E5484D',
+  },
+  statusText: {
+    alignSelf: 'flex-end',
+    color: colors.textMuted,
+    fontSize: 11,
+    marginTop: 3,
+    marginRight: 4,
+  },
+  failedRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginRight: 4,
+  },
+  failedText: {
+    color: '#E5484D',
+    marginRight: 0,
+  },
+  action: {
+    color: colors.primary,
+    fontWeight: 'bold',
+    marginRight: 0,
   },
   sender: {
     fontSize: 12,
