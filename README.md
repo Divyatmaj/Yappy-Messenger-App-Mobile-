@@ -13,7 +13,9 @@ A group messaging mobile app built with Expo and React Native. Pick a display na
 - **@mentions** – type `@` to pick a member from suggestions; mentions are highlighted, and messages that mention you get an accent outline
 - **Rich text** – links are tappable and open in the browser; messages of 1–3 emoji are shown large without a bubble
 - **Search** – find messages or people, with highlighted matches and next/previous navigation
-- **Jump to latest** – floating button with an unread counter when you've scrolled up
+- **Jump to latest** – floating button with an unread counter (and an `@` badge if you were mentioned) when you've scrolled up
+- **Unread tracking** – remembers the last message you saw; next time a *New messages* divider marks where you left off and the chat opens there
+- **In-app alerts** – when a message arrives while you're scrolled up, a tappable toast shows who sent it; mentions of you get their own alert that jumps straight to the message
 - **Group info** – member list ranked by message count, plus group stats
 - **Dark mode** – follow the system theme or force light/dark from the group info sheet
 - **Remembers you** – your display name, theme choice and the latest 200 messages are saved on the device, so the app opens straight into the chat and shows saved messages even when offline
@@ -52,7 +54,9 @@ Messenger/
         │   └── richText.js         # Links, @mentions, emoji-only detection
         ├── hooks/
         │   ├── useAppActive.js     # Foreground/background state
-        │   └── useMessages.js      # Polling, cache, optimistic send, retry, connection state
+        │   ├── useIncomingMessages.js # Detects newly arrived messages from others
+        │   ├── useMessages.js      # Polling, cache, optimistic send, retry, connection state
+        │   └── useReadState.js     # Last-read position and New messages divider
         ├── screens/
         │   ├── WelcomeScreen.js    # Display-name picker
         │   └── ChatScreen.js       # Conversation, search, scroll handling
@@ -68,6 +72,7 @@ Messenger/
             ├── MessageActionsSheet.js # Long-press menu
             ├── MentionSuggestions.js # @mention autocomplete
             ├── MessageBubble.js
+            ├── NewMessagesDivider.js
             ├── RichText.js         # Links, mentions and search highlights
             ├── SearchBar.js
             └── Toast.js            # Floating notices
@@ -160,7 +165,20 @@ The `user` field is the display name chosen on the welcome screen. It is saved o
    ```
 
 7. Type `@` in the composer to mention someone who has posted in the group. Names can contain spaces; mentions are matched against known members, longest name first.
-8. Tap 🔍 to search, or ••• for group info, members, the theme switcher and changing your name.
+8. The app saves the last message you've seen. On your next visit, unread messages from others start below a *New messages* divider. While you're scrolled up, new messages show a tappable alert at the top.
+9. Tap 🔍 to search, or ••• for group info, members, the theme switcher and changing your name.
+
+## Roadmap: push notifications
+
+The app is set up for push notifications (Expo Notifications + EAS Build + Firebase Cloud Messaging):
+
+- `app.json` already defines the app identity (`com.divyatmaj.yappy`) and a `yappy://` deep-link scheme.
+- `src/storage.js` is the place to keep the push token and notification preferences.
+- `useAppActive` tells foreground from background, so in-app alerts can be used in the foreground and system notifications in the background.
+- `useIncomingMessages` is the single place that detects new messages, and `mentionsUser()` in `src/utils/richText.js` can decide when to send a mention notification.
+- `useReadState` provides the last-read position for unread badge counts.
+
+Sending pushes needs a backend that stores each device's Expo push token and calls the Expo Push API when a message is posted.
 
 ## Troubleshooting
 

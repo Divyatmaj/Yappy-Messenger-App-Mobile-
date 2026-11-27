@@ -22,16 +22,25 @@ import ConnectionBanner from '../components/ConnectionBanner';
 import JumpToLatestButton from '../components/JumpToLatestButton';
 import MessageActionsSheet from '../components/MessageActionsSheet';
 import MessageBubble from '../components/MessageBubble';
+import NewMessagesDivider from '../components/NewMessagesDivider';
 import SearchBar from '../components/SearchBar';
 import Toast from '../components/Toast';
+import useIncomingMessages from '../hooks/useIncomingMessages';
 import useMessages from '../hooks/useMessages';
+import useReadState from '../hooks/useReadState';
 import { messageKey } from '../api';
 import {
   longPressFeedback,
   successFeedback,
   tapFeedback,
 } from '../haptics';
-import { composeReply, isQuotedMessage, parseReply } from '../utils/reply';
+import {
+  composeReply,
+  isQuotedMessage,
+  makeSnippet,
+  parseReply,
+} from '../utils/reply';
+import { mentionsUser } from '../utils/richText';
 import { useThemedStyles } from '../theme';
 
 const GROUP_NAME = 'Scalar';
@@ -39,6 +48,8 @@ const GROUP_NAME = 'Scalar';
 const NEAR_BOTTOM_PX = 80;
 // How long a message stays outlined after jumping to it from a reply.
 const FLASH_MS = 1600;
+// New-message toasts stay up a little longer than plain notices.
+const INCOMING_TOAST_MS = 3500;
 
 let toastCounter = 0;
 
@@ -61,6 +72,13 @@ export default function ChatScreen({ me, onChangeName }) {
     discard,
     refresh,
   } = useMessages(me);
+  const {
+    dividerKey,
+    unreadAtOpen,
+    ready: readReady,
+    markRead,
+    clearDivider,
+  } = useReadState(messages, me, loaded);
   const [text, setText] = useState('');
   const [infoOpen, setInfoOpen] = useState(false);
   const [replyTo, setReplyTo] = useState(null);
@@ -81,6 +99,7 @@ export default function ChatScreen({ me, onChangeName }) {
     send(replyTo ? composeReply(replyTo, body) : body);
     setText('');
     setReplyTo(null);
+    clearDivider();
     tapFeedback();
   };
 
@@ -196,6 +215,7 @@ export default function ChatScreen({ me, onChangeName }) {
   const nearBottom = useRef(true);
   const [showJump, setShowJump] = useState(false);
   const [unread, setUnread] = useState(0);
+  const [mentionPending, setMentionPending] = useState(false);
 
   const scrollToLatest = useCallback((animated = true) => {
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated }));
@@ -208,7 +228,11 @@ export default function ChatScreen({ me, onChangeName }) {
     const isNear = distance < NEAR_BOTTOM_PX;
     nearBottom.current = isNear;
     setShowJump(!isNear);
-    if (isNear) setUnread(0);
+    if (isNear) {
+      setUnread(0);
+      setMentionPending(false);
+      markRead();
+    }
   };
 
   // Follow new messages only when the user is already at the bottom (or just
@@ -225,42 +249,111 @@ export default function ChatScreen({ me, onChangeName }) {
 
     if (firstLoad) {
       scrollToLatest(false);
+    } else if (!readReady) {
+      // First server sync after showing cached messages: where to scroll
+      // is decided once the unread position is known (see below).
     } else if (sentByMe || (nearBottom.current && !searching)) {
       scrollToLatest(true);
+      markRead();
     } else {
       const fromOthers = messages
         .slice(-added)
         .filter((m) => m.user !== me).length;
       setUnread((n) => n + fromOthers);
     }
-  }, [messages, me, searching, scrollToLatest]);
+  }, [messages, me, searching, scrollToLatest, readReady, markRead]);
 
-  const jumpToLatest = () => {
+  const jumpToLatest = useCallback(() => {
     setUnread(0);
+    setMentionPending(false);
     scrollToLatest(true);
-  };
+  }, [scrollToLatest]);
 
-  // Tapping a quote scrolls to the newest earlier message it matches.
+  // Scrolls a message into view and briefly outlines it.
   const flashTimer = useRef(null);
   useEffect(() => () => clearTimeout(flashTimer.current), []);
 
+  const scrollToMessage = useCallback((index, { flash = true } = {}) => {
+    listRef.current?.scrollToIndex({
+      index,
+      viewPosition: flash ? 0.5 : 0.1,
+      animated: true,
+    });
+    if (!flash) return;
+    setFlashIndex(index);
+    clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setFlashIndex(-1), FLASH_MS);
+  }, []);
+
+  // Tapping a quote scrolls to the newest earlier message it matches.
   const jumpToQuoted = (index) => {
     const { quote } = parseReply(messages[index]?.text);
     for (let i = index - 1; i >= 0; i--) {
       if (isQuotedMessage(quote, messages[i])) {
-        listRef.current?.scrollToIndex({
-          index: i,
-          viewPosition: 0.5,
-          animated: true,
-        });
-        setFlashIndex(i);
-        clearTimeout(flashTimer.current);
-        flashTimer.current = setTimeout(() => setFlashIndex(-1), FLASH_MS);
+        scrollToMessage(i);
         return;
       }
     }
     showToast('Original message is no longer available');
   };
+
+  const indexOfKey = (key) =>
+    messages.findIndex((m, i) => !m.localId && messageKey(m, i) === key);
+
+  // Once we know where unread messages start, open the chat there.
+  // Otherwise go to the latest message and count it as read.
+  useEffect(() => {
+    if (!readReady) return;
+    const index = dividerKey ? indexOfKey(dividerKey) : -1;
+    if (index === -1) {
+      scrollToLatest(true);
+      markRead();
+      return;
+    }
+    nearBottom.current = false;
+    setUnread(unreadAtOpen);
+    setTimeout(() => scrollToMessage(index, { flash: false }), 60);
+    // Runs once, when the read state becomes ready.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readReady]);
+
+  // ---- In-app alerts for new messages -------------------------------------
+  // Shown only when the new message isn't already on screen.
+  useIncomingMessages(messages, me, readReady, (fresh) => {
+    if (nearBottom.current && !searching) return;
+
+    const mention = [...fresh]
+      .reverse()
+      .find(({ message }) =>
+        mentionsUser(parseReply(message.text).body, me),
+      );
+    if (mention) {
+      const key = messageKey(mention.message, mention.index);
+      setMentionPending(true);
+      longPressFeedback();
+      showToast(
+        `${mention.message.user} mentioned you: ${makeSnippet(
+          mention.message.text,
+        )}`,
+        {
+          duration: INCOMING_TOAST_MS,
+          onPress: () => {
+            const index = indexOfKey(key);
+            if (index !== -1) scrollToMessage(index);
+          },
+        },
+      );
+      return;
+    }
+
+    const [{ message }] = fresh.slice(-1);
+    showToast(
+      fresh.length === 1
+        ? `${message.user}: ${makeSnippet(message.text)}`
+        : `${fresh.length} new messages`,
+      { duration: INCOMING_TOAST_MS, onPress: jumpToLatest },
+    );
+  });
 
   // Item heights vary, so scrollToIndex may target an unmeasured row.
   // Scroll roughly there first so it gets rendered, then retry.
@@ -294,21 +387,31 @@ export default function ChatScreen({ me, onChangeName }) {
   const renderItem = ({ item, index }) => {
     const prev = messages[index - 1];
     const next = messages[index + 1];
+    const isDividerAt = (message, i) =>
+      dividerKey != null &&
+      message != null &&
+      !message.localId &&
+      messageKey(message, i) === dividerKey;
+    const showDivider = isDividerAt(item, index);
+    const dividerBelow = isDividerAt(next, index + 1);
     return (
-      <MessageBubble
-        message={item}
-        me={me}
-        members={members}
-        isMine={item.user === me}
-        isFirstInGroup={!prev || prev.user !== item.user}
-        isLastInGroup={!next || next.user !== item.user}
-        onRetry={() => retry(item.localId)}
-        onDiscard={() => discard(item.localId)}
-        onLongPress={() => openActions(item)}
-        onQuotePress={() => jumpToQuoted(index)}
-        query={normalizedQuery}
-        isActiveMatch={index === activeIndex || index === flashIndex}
-      />
+      <View>
+        {showDivider && <NewMessagesDivider />}
+        <MessageBubble
+          message={item}
+          me={me}
+          members={members}
+          isMine={item.user === me}
+          isFirstInGroup={showDivider || !prev || prev.user !== item.user}
+          isLastInGroup={dividerBelow || !next || next.user !== item.user}
+          onRetry={() => retry(item.localId)}
+          onDiscard={() => discard(item.localId)}
+          onLongPress={() => openActions(item)}
+          onQuotePress={() => jumpToQuoted(index)}
+          query={normalizedQuery}
+          isActiveMatch={index === activeIndex || index === flashIndex}
+        />
+      </View>
     );
   };
 
@@ -356,7 +459,12 @@ export default function ChatScreen({ me, onChangeName }) {
             ref={listRef}
             style={styles.flex}
             data={messages}
-            extraData={`${normalizedQuery}|${activeIndex}|${flashIndex}`}
+            extraData={[
+              normalizedQuery,
+              activeIndex,
+              flashIndex,
+              dividerKey,
+            ].join('|')}
             onScroll={handleScroll}
             scrollEventThrottle={100}
             onScrollToIndexFailed={handleScrollToIndexFailed}
@@ -380,6 +488,7 @@ export default function ChatScreen({ me, onChangeName }) {
           <JumpToLatestButton
             visible={showJump && messages.length > 0}
             unreadCount={unread}
+            mentioned={mentionPending}
             onPress={jumpToLatest}
           />
 

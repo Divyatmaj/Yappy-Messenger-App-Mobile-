@@ -9,6 +9,7 @@ export const KEYS = {
   displayName: 'displayName',
   themeMode: 'themeMode',
   messageCache: 'messageCache',
+  lastRead: 'lastRead',
 };
 
 /** Reads a JSON value, returning `fallback` when missing or unreadable. */

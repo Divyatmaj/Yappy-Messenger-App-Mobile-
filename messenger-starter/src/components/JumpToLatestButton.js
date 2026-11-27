@@ -1,7 +1,12 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useThemedStyles } from '../theme';
 
-export default function JumpToLatestButton({ visible, unreadCount, onPress }) {
+export default function JumpToLatestButton({
+  visible,
+  unreadCount,
+  mentioned = false,
+  onPress,
+}) {
   const { styles } = useThemedStyles(makeStyles);
   if (!visible) return null;
 
@@ -10,11 +15,13 @@ export default function JumpToLatestButton({ visible, unreadCount, onPress }) {
       style={({ pressed }) => [styles.button, pressed && styles.pressed]}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={
-        unreadCount > 0
-          ? `Jump to latest, ${unreadCount} new messages`
-          : 'Jump to latest'
-      }
+      accessibilityLabel={[
+        'Jump to latest',
+        unreadCount > 0 && `${unreadCount} new messages`,
+        mentioned && 'you were mentioned',
+      ]
+        .filter(Boolean)
+        .join(', ')}
     >
       <Text style={styles.arrow}>↓</Text>
       {unreadCount > 0 && (
@@ -22,6 +29,11 @@ export default function JumpToLatestButton({ visible, unreadCount, onPress }) {
           <Text style={styles.badgeText}>
             {unreadCount > 99 ? '99+' : unreadCount}
           </Text>
+        </View>
+      )}
+      {mentioned && (
+        <View style={styles.mentionBadge}>
+          <Text style={styles.badgeText}>@</Text>
         </View>
       )}
     </Pressable>
@@ -65,6 +77,19 @@ const makeStyles = (colors) =>
       borderRadius: 10,
       paddingHorizontal: 5,
       backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: colors.background,
+    },
+    mentionBadge: {
+      position: 'absolute',
+      top: -6,
+      left: -4,
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: colors.danger,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 2,
