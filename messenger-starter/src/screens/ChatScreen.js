@@ -38,8 +38,16 @@ function matchesQuery(message, q) {
 
 export default function ChatScreen({ me, onChangeName }) {
   const { styles, colors } = useThemedStyles(makeStyles);
-  const { messages, loaded, online, send, retry, discard, refresh } =
-    useMessages(me);
+  const {
+    messages,
+    loaded,
+    online,
+    fromCache,
+    send,
+    retry,
+    discard,
+    refresh,
+  } = useMessages(me);
   const [text, setText] = useState('');
   const [infoOpen, setInfoOpen] = useState(false);
   const listRef = useRef(null);
@@ -202,15 +210,23 @@ export default function ChatScreen({ me, onChangeName }) {
         ) : (
           <ChatHeader
             title={GROUP_NAME}
-            subtitle={`${participants.size || 'No'} member${
-              participants.size === 1 ? '' : 's'
-            } · Group conversation`}
+            subtitle={
+              fromCache && online
+                ? 'Updating…'
+                : `${participants.size || 'No'} member${
+                    participants.size === 1 ? '' : 's'
+                  } · Group conversation`
+            }
             onSearchPress={() => setSearching(true)}
             onMenuPress={() => setInfoOpen(true)}
           />
         )}
 
-        <ConnectionBanner visible={!online} onRetry={refresh} />
+        <ConnectionBanner
+          visible={!online}
+          showingSaved={fromCache}
+          onRetry={refresh}
+        />
 
         <View style={styles.flex}>
           <FlatList

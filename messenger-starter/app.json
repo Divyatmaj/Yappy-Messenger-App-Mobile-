@@ -1,16 +1,18 @@
 {
   "expo": {
-    "name": "starter",
-    "slug": "starter",
+    "name": "Yappy",
+    "slug": "yappy",
+    "scheme": "yappy",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.divyatmaj.starter"
+      "bundleIdentifier": "com.divyatmaj.yappy"
     },
     "android": {
+      "package": "com.divyatmaj.yappy",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",

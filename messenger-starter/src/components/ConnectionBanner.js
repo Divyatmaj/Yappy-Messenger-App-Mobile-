@@ -1,14 +1,18 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useThemedStyles } from '../theme';
 
-export default function ConnectionBanner({ visible, onRetry }) {
+export default function ConnectionBanner({ visible, showingSaved, onRetry }) {
   const { styles } = useThemedStyles(makeStyles);
   if (!visible) return null;
 
   return (
     <View style={styles.banner} accessibilityRole="alert">
       <View style={styles.dot} />
-      <Text style={styles.text}>Can't reach the server. Retrying…</Text>
+      <Text style={styles.text}>
+        {showingSaved
+          ? 'Offline · showing saved messages'
+          : "Can't reach the server. Retrying…"}
+      </Text>
       <Pressable onPress={onRetry} hitSlop={8}>
         <Text style={styles.action}>Retry now</Text>
       </Pressable>

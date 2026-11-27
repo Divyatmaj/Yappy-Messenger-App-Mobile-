@@ -12,6 +12,8 @@ A group messaging mobile app built with Expo and React Native. Pick a display na
 - **Jump to latest** – floating button with an unread counter when you've scrolled up
 - **Group info** – member list ranked by message count, plus group stats
 - **Dark mode** – follow the system theme or force light/dark from the group info sheet
+- **Remembers you** – your display name, theme choice and the latest 200 messages are saved on the device, so the app opens straight into the chat and shows saved messages even when offline
+- **Battery friendly** – polling pauses while the app is in the background and refreshes as soon as you return
 - Automatic refresh every two seconds, without overlapping requests
 - Multiline input with a 2,000-character limit and counter
 - Keyboard-aware, safe-area-aware layout on iOS and Android
@@ -23,6 +25,7 @@ A group messaging mobile app built with Expo and React Native. Pick a display na
 - React 19
 - `react-native-safe-area-context`
 - `expo-status-bar`
+- `@react-native-async-storage/async-storage`
 
 ## Project Structure
 
@@ -36,9 +39,11 @@ Messenger/
     ├── package.json                # Dependencies and scripts
     └── src/
         ├── api.js                  # Backend calls (GET/POST /messages)
+        ├── storage.js              # AsyncStorage wrapper and persisted keys
         ├── theme.js                # Light/dark palettes, ThemeProvider, avatar colors
         ├── hooks/
-        │   └── useMessages.js      # Polling, optimistic send, retry, connection state
+        │   ├── useAppActive.js     # Foreground/background state
+        │   └── useMessages.js      # Polling, cache, optimistic send, retry, connection state
         ├── screens/
         │   ├── WelcomeScreen.js    # Display-name picker
         │   └── ChatScreen.js       # Conversation, search, scroll handling
@@ -125,12 +130,12 @@ Request body:
 }
 ```
 
-The `user` field is the display name chosen on the welcome screen. It is kept in memory only, so the app asks for it again on each launch (persisting it would require a storage package such as `@react-native-async-storage/async-storage`).
+The `user` field is the display name chosen on the welcome screen. It is saved on the device, so the welcome screen only appears on first launch or after tapping **Change**.
 
 ## How It Works
 
-1. On launch you choose a display name on the welcome screen.
-2. The chat screen loads messages and polls `GET /messages` every two seconds. A poll is skipped while the previous one is still in flight, and stale responses are ignored.
+1. On first launch you choose a display name on the welcome screen. Later launches go straight to the chat.
+2. Saved messages from the last session appear immediately. The chat screen then polls `GET /messages` every two seconds. A poll is skipped while the previous one is still in flight, stale responses are ignored, and polling stops while the app is in the background.
 3. Sending adds the message locally right away (*Sending…*) and calls `POST /messages`. On success the local copy is replaced by the server copy; on failure it is marked *Not sent* with **Retry** and **Delete** options.
 4. Messages whose `user` matches your display name appear on the right; others appear on the left with a sender name and colored avatar.
 5. If you've scrolled up, new messages don't move the list; the jump-to-latest button shows how many arrived.

@@ -1,5 +1,13 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { useColorScheme } from 'react-native';
+import { KEYS, load, save } from './storage';
 
 export const lightColors = {
   background: '#F4F6FB',
@@ -98,11 +106,28 @@ const ThemeContext = createContext({
   isDark: false,
   mode: 'system',
   setMode: () => {},
+  ready: false,
 });
 
 export function ThemeProvider({ children }) {
   const systemScheme = useColorScheme();
-  const [mode, setMode] = useState('system');
+  const [mode, setModeState] = useState('system');
+  // False until the saved mode has been read, so the app can avoid
+  // flashing the wrong theme on launch.
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    load(KEYS.themeMode, 'system').then((saved) => {
+      if (THEME_MODES.includes(saved)) setModeState(saved);
+      setReady(true);
+    });
+  }, []);
+
+  const setMode = useCallback((next) => {
+    setModeState(next);
+    save(KEYS.themeMode, next);
+  }, []);
+
   const isDark =
     mode === 'dark' || (mode === 'system' && systemScheme === 'dark');
 
@@ -112,8 +137,9 @@ export function ThemeProvider({ children }) {
       isDark,
       mode,
       setMode,
+      ready,
     }),
-    [isDark, mode],
+    [isDark, mode, setMode, ready],
   );
 
   return (

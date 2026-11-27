@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchMessages, postMessage } from '../api';
+import useAppActive from './useAppActive';
+import { KEYS, load, save } from '../storage';
 
 const POLL_INTERVAL_MS = 2000;
+// Enough history to fill the screen instantly on the next launch.
+const CACHE_LIMIT = 200;
 
 let localIdCounter = 0;
 
@@ -11,13 +15,20 @@ let localIdCounter = 0;
  * `messages` merges server messages with local ones that are still
  * sending or have failed; local messages carry `localId` and `status`.
  * `loaded` turns true after the first successful response; `online` is
- * false while the most recent request failed.
+ * false while the most recent request failed. `fromCache` is true while
+ * the list shows messages saved on a previous launch and the server has
+ * not answered yet.
+ *
+ * Polling pauses while the app is in the background and refreshes as soon
+ * as it comes back to the foreground.
  */
 export default function useMessages(me) {
   const [serverMessages, setServerMessages] = useState([]);
   const [pending, setPending] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [online, setOnline] = useState(true);
+  const [fromCache, setFromCache] = useState(false);
+  const appActive = useAppActive();
   const inFlight = useRef(false);
   const lastPayload = useRef('');
   const requestSeq = useRef(0);
@@ -38,7 +49,9 @@ export default function useMessages(me) {
       if (payload !== lastPayload.current) {
         lastPayload.current = payload;
         setServerMessages(data);
+        save(KEYS.messageCache, data.slice(-CACHE_LIMIT));
       }
+      setFromCache(false);
       setLoaded(true);
       setOnline(true);
       return true;
@@ -51,11 +64,22 @@ export default function useMessages(me) {
     }
   }, []);
 
+  // Show the last saved conversation until the server answers.
   useEffect(() => {
-    refresh();
+    load(KEYS.messageCache, []).then((cached) => {
+      if (appliedSeq.current > 0 || !Array.isArray(cached)) return;
+      if (cached.length === 0) return;
+      setServerMessages(cached);
+      setFromCache(true);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!appActive) return;
+    refresh(true);
     const interval = setInterval(refresh, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [refresh]);
+  }, [refresh, appActive]);
 
   const deliver = useCallback(
     async (localId, text) => {
@@ -119,6 +143,7 @@ export default function useMessages(me) {
     messages,
     loaded,
     online,
+    fromCache,
     send,
     retry,
     discard,
