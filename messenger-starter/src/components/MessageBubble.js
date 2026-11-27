@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Avatar from './Avatar';
 import HighlightedText from './HighlightedText';
-import { colors, colorForUser, radius } from '../theme';
+import { useThemedStyles, colorForUser, radius } from '../theme';
 
 const AVATAR_SIZE = 32;
 
@@ -20,6 +20,7 @@ export default function MessageBubble({
   query = '',
   isActiveMatch = false,
 }) {
+  const { styles, isDark } = useThemedStyles(makeStyles);
   const { status } = message;
   const failed = status === 'failed';
 
@@ -56,7 +57,10 @@ export default function MessageBubble({
             <HighlightedText
               text={message.user}
               query={query}
-              style={[styles.sender, { color: colorForUser(message.user).fg }]}
+              style={[
+                styles.sender,
+                { color: colorForUser(message.user, isDark).fg },
+              ]}
               highlightStyle={styles.highlight}
             />
           )}
@@ -89,95 +93,96 @@ export default function MessageBubble({
   );
 }
 
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-  },
-  myRow: {
-    justifyContent: 'flex-end',
-  },
-  otherRow: {
-    justifyContent: 'flex-start',
-  },
-  groupStart: {
-    marginTop: 10,
-  },
-  groupContinue: {
-    marginTop: 2,
-  },
-  avatarSlot: {
-    width: AVATAR_SIZE,
-    marginRight: 8,
-  },
-  bubble: {
-    maxWidth: '78%',
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: radius.bubble,
-  },
-  mine: {
-    backgroundColor: colors.primary,
-    borderBottomRightRadius: radius.tail,
-  },
-  mineContinued: {
-    borderBottomRightRadius: radius.bubble,
-  },
-  others: {
-    backgroundColor: colors.surface,
-    borderBottomLeftRadius: radius.tail,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  othersContinued: {
-    borderBottomLeftRadius: radius.bubble,
-  },
-  activeMatch: {
-    borderWidth: 2,
-    borderColor: '#F5B700',
-  },
-  highlight: {
-    backgroundColor: '#FFE066',
-    color: '#30364B',
-  },
-  sending: {
-    opacity: 0.6,
-  },
-  failed: {
-    backgroundColor: '#E5484D',
-  },
-  statusText: {
-    alignSelf: 'flex-end',
-    color: colors.textMuted,
-    fontSize: 11,
-    marginTop: 3,
-    marginRight: 4,
-  },
-  failedRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginRight: 4,
-  },
-  failedText: {
-    color: '#E5484D',
-    marginRight: 0,
-  },
-  action: {
-    color: colors.primary,
-    fontWeight: 'bold',
-    marginRight: 0,
-  },
-  sender: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    marginBottom: 3,
-  },
-  text: {
-    color: colors.text,
-    fontSize: 15,
-    lineHeight: 21,
-  },
-  myText: {
-    color: colors.onPrimary,
-  },
-});
+const makeStyles = (colors) =>
+  StyleSheet.create({
+    row: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+    },
+    myRow: {
+      justifyContent: 'flex-end',
+    },
+    otherRow: {
+      justifyContent: 'flex-start',
+    },
+    groupStart: {
+      marginTop: 10,
+    },
+    groupContinue: {
+      marginTop: 2,
+    },
+    avatarSlot: {
+      width: AVATAR_SIZE,
+      marginRight: 8,
+    },
+    bubble: {
+      maxWidth: '78%',
+      paddingHorizontal: 14,
+      paddingVertical: 9,
+      borderRadius: radius.bubble,
+    },
+    mine: {
+      backgroundColor: colors.primary,
+      borderBottomRightRadius: radius.tail,
+    },
+    mineContinued: {
+      borderBottomRightRadius: radius.bubble,
+    },
+    others: {
+      backgroundColor: colors.surface,
+      borderBottomLeftRadius: radius.tail,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    othersContinued: {
+      borderBottomLeftRadius: radius.bubble,
+    },
+    activeMatch: {
+      borderWidth: 2,
+      borderColor: colors.activeMatch,
+    },
+    highlight: {
+      backgroundColor: colors.highlight,
+      color: colors.onHighlight,
+    },
+    sending: {
+      opacity: 0.6,
+    },
+    failed: {
+      backgroundColor: colors.danger,
+    },
+    statusText: {
+      alignSelf: 'flex-end',
+      color: colors.textMuted,
+      fontSize: 11,
+      marginTop: 3,
+      marginRight: 4,
+    },
+    failedRow: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      marginRight: 4,
+    },
+    failedText: {
+      color: colors.danger,
+      marginRight: 0,
+    },
+    action: {
+      color: colors.primary,
+      fontWeight: 'bold',
+      marginRight: 0,
+    },
+    sender: {
+      fontSize: 12,
+      fontWeight: 'bold',
+      marginBottom: 3,
+    },
+    text: {
+      color: colors.text,
+      fontSize: 15,
+      lineHeight: 21,
+    },
+    myText: {
+      color: colors.onPrimary,
+    },
+  });

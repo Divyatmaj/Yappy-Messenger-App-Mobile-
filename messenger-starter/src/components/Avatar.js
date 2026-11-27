@@ -1,8 +1,9 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { colorForUser } from '../theme';
+import { useThemedStyles, colorForUser } from '../theme';
 
 export default function Avatar({ name, size = 32 }) {
-  const { bg, fg } = colorForUser(name);
+  const { styles, isDark } = useThemedStyles(makeStyles);
+  const { bg, fg } = colorForUser(name, isDark);
   const initial = name?.trim().charAt(0).toUpperCase() || '?';
 
   return (
@@ -24,12 +25,13 @@ export default function Avatar({ name, size = 32 }) {
   );
 }
 
-const styles = StyleSheet.create({
-  avatar: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  text: {
-    fontWeight: 'bold',
-  },
-});
+const makeStyles = (colors) =>
+  StyleSheet.create({
+    avatar: {
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    text: {
+      fontWeight: 'bold',
+    },
+  });

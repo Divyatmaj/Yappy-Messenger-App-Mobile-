@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { colors } from '../theme';
+import { useThemedStyles } from '../theme';
 
 export default function SearchBar({
   query,
@@ -10,6 +10,7 @@ export default function SearchBar({
   onNext,
   onClose,
 }) {
+  const { styles, colors } = useThemedStyles(makeStyles);
   const hasQuery = query.trim().length > 0;
   const hasMatches = matchCount > 0;
 
@@ -61,60 +62,61 @@ export default function SearchBar({
   );
 }
 
-const styles = StyleSheet.create({
-  bar: {
-    backgroundColor: colors.header,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 13,
-    minHeight: 78,
-    zIndex: 1,
-  },
-  inputWrap: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    height: 44,
-  },
-  icon: {
-    color: colors.headerSubtle,
-    fontSize: 14,
-    marginRight: 8,
-  },
-  input: {
-    flex: 1,
-    color: colors.onPrimary,
-    fontSize: 15,
-    paddingVertical: 0,
-  },
-  count: {
-    color: colors.headerSubtle,
-    fontSize: 12,
-    marginLeft: 6,
-  },
-  navButton: {
-    width: 32,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  navText: {
-    color: colors.onPrimary,
-    fontSize: 13,
-  },
-  disabled: {
-    opacity: 0.35,
-  },
-  close: {
-    paddingLeft: 6,
-  },
-  closeText: {
-    color: colors.onPrimary,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-});
+const makeStyles = (colors) =>
+  StyleSheet.create({
+    bar: {
+      backgroundColor: colors.header,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 13,
+      minHeight: 78,
+      zIndex: 1,
+    },
+    inputWrap: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255,255,255,0.1)',
+      borderRadius: 14,
+      paddingHorizontal: 12,
+      height: 44,
+    },
+    icon: {
+      color: colors.headerSubtle,
+      fontSize: 14,
+      marginRight: 8,
+    },
+    input: {
+      flex: 1,
+      color: colors.onPrimary,
+      fontSize: 15,
+      paddingVertical: 0,
+    },
+    count: {
+      color: colors.headerSubtle,
+      fontSize: 12,
+      marginLeft: 6,
+    },
+    navButton: {
+      width: 32,
+      height: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    navText: {
+      color: colors.onPrimary,
+      fontSize: 13,
+    },
+    disabled: {
+      opacity: 0.35,
+    },
+    close: {
+      paddingLeft: 6,
+    },
+    closeText: {
+      color: colors.onPrimary,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+  });

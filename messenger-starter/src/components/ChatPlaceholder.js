@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { colors } from '../theme';
+import { useThemedStyles } from '../theme';
 
 // The free backend host can take a while to wake up after being idle.
 const SLOW_LOAD_MS = 4000;
 
 export default function ChatPlaceholder({ loading, groupName }) {
+  const { styles, colors } = useThemedStyles(makeStyles);
   const [slow, setSlow] = useState(false);
 
   useEffect(() => {
@@ -32,35 +33,34 @@ export default function ChatPlaceholder({ loading, groupName }) {
     <View style={styles.container}>
       <Text style={styles.emoji}>👋</Text>
       <Text style={styles.title}>No messages yet</Text>
-      <Text style={styles.body}>
-        Be the first to say hi to {groupName}!
-      </Text>
+      <Text style={styles.body}>Be the first to say hi to {groupName}!</Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 40,
-    paddingVertical: 60,
-  },
-  emoji: {
-    fontSize: 44,
-  },
-  title: {
-    color: colors.textStrong,
-    fontSize: 17,
-    fontWeight: 'bold',
-    marginTop: 14,
-  },
-  body: {
-    color: colors.textMuted,
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 6,
-    lineHeight: 20,
-  },
-});
+const makeStyles = (colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 40,
+      paddingVertical: 60,
+    },
+    emoji: {
+      fontSize: 44,
+    },
+    title: {
+      color: colors.textStrong,
+      fontSize: 17,
+      fontWeight: 'bold',
+      marginTop: 14,
+    },
+    body: {
+      color: colors.textMuted,
+      fontSize: 14,
+      textAlign: 'center',
+      marginTop: 6,
+      lineHeight: 20,
+    },
+  });

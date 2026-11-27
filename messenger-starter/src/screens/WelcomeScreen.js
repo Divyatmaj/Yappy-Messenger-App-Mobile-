@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Avatar from '../components/Avatar';
 import { fetchMessages } from '../api';
-import { colors, radius } from '../theme';
+import { useThemedStyles, radius } from '../theme';
 
 const MIN_LENGTH = 2;
 const MAX_LENGTH = 20;
@@ -32,6 +32,7 @@ export function validateName(raw) {
 }
 
 export default function WelcomeScreen({ initialName = '', onJoin }) {
+  const { styles, colors } = useThemedStyles(makeStyles);
   const [name, setName] = useState(initialName);
   const [touched, setTouched] = useState(false);
   const [recentNames, setRecentNames] = useState([]);
@@ -151,145 +152,146 @@ export default function WelcomeScreen({ initialName = '', onJoin }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.header,
-  },
-  flex: {
-    flex: 1,
-  },
-  content: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 24,
-  },
-  hero: {
-    alignItems: 'center',
-    marginBottom: 28,
-  },
-  logo: {
-    width: 76,
-    height: 76,
-    borderRadius: 26,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-    transform: [{ rotate: '-6deg' }],
-  },
-  logoText: {
-    color: colors.onPrimary,
-    fontSize: 38,
-    fontWeight: 'bold',
-  },
-  title: {
-    color: colors.onPrimary,
-    fontSize: 32,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
-  },
-  subtitle: {
-    color: colors.headerSubtle,
-    fontSize: 15,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: 24,
-    padding: 22,
-  },
-  label: {
-    color: colors.textStrong,
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    paddingHorizontal: 12,
-    minHeight: 52,
-  },
-  inputError: {
-    borderColor: '#E5484D',
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: colors.textStrong,
-    paddingVertical: 12,
-  },
-  hint: {
-    color: colors.textMuted,
-    fontSize: 12,
-    marginTop: 6,
-    marginLeft: 4,
-  },
-  errorText: {
-    color: '#E5484D',
-  },
-  button: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.pill,
-    paddingVertical: 15,
-    alignItems: 'center',
-    marginTop: 18,
-  },
-  buttonDisabled: {
-    backgroundColor: colors.primaryDisabled,
-  },
-  buttonPressed: {
-    opacity: 0.85,
-  },
-  buttonText: {
-    color: colors.onPrimary,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  recent: {
-    marginTop: 22,
-  },
-  recentLabel: {
-    color: colors.textMuted,
-    fontSize: 10,
-    fontWeight: 'bold',
-    letterSpacing: 2,
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  chips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingLeft: 5,
-    paddingRight: 12,
-    paddingVertical: 5,
-    maxWidth: 160,
-  },
-  chipPressed: {
-    backgroundColor: colors.border,
-  },
-  chipText: {
-    color: colors.textStrong,
-    fontSize: 13,
-    fontWeight: '600',
-    flexShrink: 1,
-  },
-});
+const makeStyles = (colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.header,
+    },
+    flex: {
+      flex: 1,
+    },
+    content: {
+      flexGrow: 1,
+      justifyContent: 'center',
+      padding: 24,
+    },
+    hero: {
+      alignItems: 'center',
+      marginBottom: 28,
+    },
+    logo: {
+      width: 76,
+      height: 76,
+      borderRadius: 26,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 16,
+      transform: [{ rotate: '-6deg' }],
+    },
+    logoText: {
+      color: colors.onPrimary,
+      fontSize: 38,
+      fontWeight: 'bold',
+    },
+    title: {
+      color: colors.onPrimary,
+      fontSize: 32,
+      fontWeight: 'bold',
+      letterSpacing: 0.5,
+    },
+    subtitle: {
+      color: colors.headerSubtle,
+      fontSize: 15,
+      marginTop: 8,
+      textAlign: 'center',
+    },
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: 24,
+      padding: 22,
+    },
+    label: {
+      color: colors.textStrong,
+      fontSize: 16,
+      fontWeight: 'bold',
+      marginBottom: 12,
+    },
+    inputRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: colors.surfaceMuted,
+      borderRadius: 14,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      paddingHorizontal: 12,
+      minHeight: 52,
+    },
+    inputError: {
+      borderColor: colors.danger,
+    },
+    input: {
+      flex: 1,
+      fontSize: 16,
+      color: colors.textStrong,
+      paddingVertical: 12,
+    },
+    hint: {
+      color: colors.textMuted,
+      fontSize: 12,
+      marginTop: 6,
+      marginLeft: 4,
+    },
+    errorText: {
+      color: colors.danger,
+    },
+    button: {
+      backgroundColor: colors.primary,
+      borderRadius: radius.pill,
+      paddingVertical: 15,
+      alignItems: 'center',
+      marginTop: 18,
+    },
+    buttonDisabled: {
+      backgroundColor: colors.primaryDisabled,
+    },
+    buttonPressed: {
+      opacity: 0.85,
+    },
+    buttonText: {
+      color: colors.onPrimary,
+      fontSize: 16,
+      fontWeight: 'bold',
+    },
+    recent: {
+      marginTop: 22,
+    },
+    recentLabel: {
+      color: colors.textMuted,
+      fontSize: 10,
+      fontWeight: 'bold',
+      letterSpacing: 2,
+      marginBottom: 10,
+      textAlign: 'center',
+    },
+    chips: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    chip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: colors.surfaceMuted,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingLeft: 5,
+      paddingRight: 12,
+      paddingVertical: 5,
+      maxWidth: 160,
+    },
+    chipPressed: {
+      backgroundColor: colors.border,
+    },
+    chipText: {
+      color: colors.textStrong,
+      fontSize: 13,
+      fontWeight: '600',
+      flexShrink: 1,
+    },
+  });

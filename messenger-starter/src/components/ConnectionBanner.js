@@ -1,6 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useThemedStyles } from '../theme';
 
 export default function ConnectionBanner({ visible, onRetry }) {
+  const { styles } = useThemedStyles(makeStyles);
   if (!visible) return null;
 
   return (
@@ -14,31 +16,32 @@ export default function ConnectionBanner({ visible, onRetry }) {
   );
 }
 
-const styles = StyleSheet.create({
-  banner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF4E5',
-    borderBottomWidth: 1,
-    borderBottomColor: '#FFE0B2',
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#F59E0B',
-    marginRight: 8,
-  },
-  text: {
-    flex: 1,
-    color: '#8A5300',
-    fontSize: 13,
-  },
-  action: {
-    color: '#8A5300',
-    fontSize: 13,
-    fontWeight: 'bold',
-  },
-});
+const makeStyles = (colors) =>
+  StyleSheet.create({
+    banner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.warningBg,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.warningBorder,
+      paddingHorizontal: 16,
+      paddingVertical: 9,
+    },
+    dot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: colors.warningDot,
+      marginRight: 8,
+    },
+    text: {
+      flex: 1,
+      color: colors.warningText,
+      fontSize: 13,
+    },
+    action: {
+      color: colors.warningText,
+      fontSize: 13,
+      fontWeight: 'bold',
+    },
+  });

@@ -1,15 +1,20 @@
 # Yappy Messenger
 
-A simple group messaging mobile app built with Expo and React Native. The app displays messages from the Scalar group conversation, refreshes the conversation periodically, and lets the current user send new messages.
+A group messaging mobile app built with Expo and React Native. Pick a display name, join the Scalar group conversation, and chat in real time with a polished light or dark UI.
 
 ## Features
 
-- Group conversation UI with sent and received message bubbles
-- Sender avatars for messages from other users
-- Automatic message refresh every two seconds
-- Multiline message input with a 2,000-character limit
-- Keyboard-aware layout for iOS and Android
-- Responsive safe-area handling
+- **Welcome screen** – choose a display name (2–20 characters) or continue as a recent participant; change it any time
+- **Polished chat UI** – per-user avatar colors, grouped consecutive messages, auto-scroll to the latest message
+- **Optimistic sending** – messages appear instantly with a *Sending…* state; failed sends can be retried or deleted
+- **Connection awareness** – offline banner with manual retry, loading state for slow server wake-ups, and an empty state
+- **Search** – find messages or people, with highlighted matches and next/previous navigation
+- **Jump to latest** – floating button with an unread counter when you've scrolled up
+- **Group info** – member list ranked by message count, plus group stats
+- **Dark mode** – follow the system theme or force light/dark from the group info sheet
+- Automatic refresh every two seconds, without overlapping requests
+- Multiline input with a 2,000-character limit and counter
+- Keyboard-aware, safe-area-aware layout on iOS and Android
 
 ## Tech Stack
 
@@ -25,10 +30,29 @@ A simple group messaging mobile app built with Expo and React Native. The app di
 Messenger/
 ├── README.md
 └── messenger-starter/
-    ├── App.js          # Main chat screen and API integration
-    ├── app.json        # Expo application configuration
-    ├── index.js        # Expo entry point
-    └── package.json    # Dependencies and scripts
+    ├── App.js                      # Root: theme provider + welcome/chat switch
+    ├── app.json                    # Expo application configuration
+    ├── index.js                    # Expo entry point
+    ├── package.json                # Dependencies and scripts
+    └── src/
+        ├── api.js                  # Backend calls (GET/POST /messages)
+        ├── theme.js                # Light/dark palettes, ThemeProvider, avatar colors
+        ├── hooks/
+        │   └── useMessages.js      # Polling, optimistic send, retry, connection state
+        ├── screens/
+        │   ├── WelcomeScreen.js    # Display-name picker
+        │   └── ChatScreen.js       # Conversation, search, scroll handling
+        └── components/
+            ├── Avatar.js
+            ├── ChatHeader.js
+            ├── ChatPlaceholder.js  # Loading / empty states
+            ├── Composer.js         # Message input
+            ├── ConnectionBanner.js
+            ├── GroupInfoSheet.js   # Members, stats, theme switcher
+            ├── HighlightedText.js
+            ├── JumpToLatestButton.js
+            ├── MessageBubble.js
+            └── SearchBar.js
 ```
 
 ## Prerequisites
@@ -101,21 +125,23 @@ Request body:
 }
 ```
 
-The current user is defined in `App.js` as `Newton`. Update that value when adding user identity or authentication.
+The `user` field is the display name chosen on the welcome screen. It is kept in memory only, so the app asks for it again on each launch (persisting it would require a storage package such as `@react-native-async-storage/async-storage`).
 
 ## How It Works
 
-1. The app loads messages when the screen mounts.
-2. It polls `GET /messages` every two seconds to keep the conversation current.
-3. Empty or whitespace-only messages cannot be sent.
-4. A successful `POST /messages` clears the input and reloads the messages.
-5. Messages authored by `Newton` appear on the right; other messages appear on the left with the sender name and avatar.
+1. On launch you choose a display name on the welcome screen.
+2. The chat screen loads messages and polls `GET /messages` every two seconds. A poll is skipped while the previous one is still in flight, and stale responses are ignored.
+3. Sending adds the message locally right away (*Sending…*) and calls `POST /messages`. On success the local copy is replaced by the server copy; on failure it is marked *Not sent* with **Retry** and **Delete** options.
+4. Messages whose `user` matches your display name appear on the right; others appear on the left with a sender name and colored avatar.
+5. If you've scrolled up, new messages don't move the list; the jump-to-latest button shows how many arrived.
+6. Tap 🔍 to search, or ••• for group info, members, the theme switcher and changing your name.
 
 ## Troubleshooting
 
 - **No messages appear:** Confirm that the backend is running and that `GET https://messenger-yzgf.onrender.com/messages` returns a JSON array.
 - **Messages cannot be sent:** Check the backend's `POST /messages` endpoint and verify that it accepts the `user` and `text` fields.
-- **The app cannot connect on a device:** Make sure the device has internet access. If using a local API instead, replace the `URL` constant in `App.js` with an address reachable from the device.
+- **The app cannot connect on a device:** Make sure the device has internet access. If using a local API instead, replace `API_URL` in `src/api.js` with an address reachable from the device.
+- **First load is slow:** The hosted backend sleeps when idle and can take up to a minute to wake up; the app shows a notice while it waits.
 - **iOS build issues:** Run CocoaPods installation from `messenger-starter/ios` if required by the native build setup.
 
 ## License

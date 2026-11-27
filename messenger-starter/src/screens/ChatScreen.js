@@ -16,13 +16,14 @@ import {
 import ChatHeader from '../components/ChatHeader';
 import ChatPlaceholder from '../components/ChatPlaceholder';
 import Composer from '../components/Composer';
+import GroupInfoSheet from '../components/GroupInfoSheet';
 import ConnectionBanner from '../components/ConnectionBanner';
 import JumpToLatestButton from '../components/JumpToLatestButton';
 import MessageBubble from '../components/MessageBubble';
 import SearchBar from '../components/SearchBar';
 import useMessages from '../hooks/useMessages';
 import { messageKey } from '../api';
-import { colors } from '../theme';
+import { useThemedStyles } from '../theme';
 
 const GROUP_NAME = 'Scalar';
 // How close (in px) to the bottom still counts as "reading the latest".
@@ -36,9 +37,11 @@ function matchesQuery(message, q) {
 }
 
 export default function ChatScreen({ me, onChangeName }) {
+  const { styles, colors } = useThemedStyles(makeStyles);
   const { messages, loaded, online, send, retry, discard, refresh } =
     useMessages(me);
   const [text, setText] = useState('');
+  const [infoOpen, setInfoOpen] = useState(false);
   const listRef = useRef(null);
   const insets = useSafeAreaInsets();
 
@@ -203,6 +206,7 @@ export default function ChatScreen({ me, onChangeName }) {
               participants.size === 1 ? '' : 's'
             } · Group conversation`}
             onSearchPress={() => setSearching(true)}
+            onMenuPress={() => setInfoOpen(true)}
           />
         )}
 
@@ -257,32 +261,42 @@ export default function ChatScreen({ me, onChangeName }) {
           />
         </View>
       </KeyboardAvoidingView>
+
+      <GroupInfoSheet
+        visible={infoOpen}
+        onClose={() => setInfoOpen(false)}
+        groupName={GROUP_NAME}
+        messages={messages}
+        me={me}
+        onChangeName={onChangeName}
+      />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.header,
-  },
-  flex: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  dateLabel: {
-    alignSelf: 'center',
-    color: colors.textMuted,
-    fontSize: 10,
-    fontWeight: 'bold',
-    letterSpacing: 2,
-    marginTop: 4,
-    marginBottom: 6,
-  },
-  messagesContent: {
-    flexGrow: 1,
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 14,
-  },
-});
+const makeStyles = (colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.header,
+    },
+    flex: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    dateLabel: {
+      alignSelf: 'center',
+      color: colors.textMuted,
+      fontSize: 10,
+      fontWeight: 'bold',
+      letterSpacing: 2,
+      marginTop: 4,
+      marginBottom: 6,
+    },
+    messagesContent: {
+      flexGrow: 1,
+      paddingHorizontal: 14,
+      paddingTop: 14,
+      paddingBottom: 14,
+    },
+  });
