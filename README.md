@@ -8,6 +8,8 @@ A group messaging mobile app built with Expo and React Native. Pick a display na
 - **Polished chat UI** – per-user avatar colors, grouped consecutive messages, auto-scroll to the latest message
 - **Optimistic sending** – messages appear instantly with a *Sending…* state; failed sends can be retried or deleted
 - **Connection awareness** – offline banner with manual retry, loading state for slow server wake-ups, and an empty state
+- **Message actions** – long-press any message to reply or copy it (failed messages also offer retry/delete), with haptic feedback
+- **Replies** – quoted replies show the original sender and snippet; tap the quote to jump to the original message
 - **Search** – find messages or people, with highlighted matches and next/previous navigation
 - **Jump to latest** – floating button with an unread counter when you've scrolled up
 - **Group info** – member list ranked by message count, plus group stats
@@ -26,6 +28,7 @@ A group messaging mobile app built with Expo and React Native. Pick a display na
 - `react-native-safe-area-context`
 - `expo-status-bar`
 - `@react-native-async-storage/async-storage`
+- `expo-clipboard`, `expo-haptics`
 
 ## Project Structure
 
@@ -39,8 +42,11 @@ Messenger/
     ├── package.json                # Dependencies and scripts
     └── src/
         ├── api.js                  # Backend calls (GET/POST /messages)
+        ├── haptics.js              # Safe haptic feedback helpers
         ├── storage.js              # AsyncStorage wrapper and persisted keys
         ├── theme.js                # Light/dark palettes, ThemeProvider, avatar colors
+        ├── utils/
+        │   └── reply.js            # Encode/parse quoted replies
         ├── hooks/
         │   ├── useAppActive.js     # Foreground/background state
         │   └── useMessages.js      # Polling, cache, optimistic send, retry, connection state
@@ -56,8 +62,10 @@ Messenger/
             ├── GroupInfoSheet.js   # Members, stats, theme switcher
             ├── HighlightedText.js
             ├── JumpToLatestButton.js
+            ├── MessageActionsSheet.js # Long-press menu
             ├── MessageBubble.js
-            └── SearchBar.js
+            ├── SearchBar.js
+            └── Toast.js            # Floating notices
 ```
 
 ## Prerequisites
@@ -139,7 +147,14 @@ The `user` field is the display name chosen on the welcome screen. It is saved o
 3. Sending adds the message locally right away (*Sending…*) and calls `POST /messages`. On success the local copy is replaced by the server copy; on failure it is marked *Not sent* with **Retry** and **Delete** options.
 4. Messages whose `user` matches your display name appear on the right; others appear on the left with a sender name and colored avatar.
 5. If you've scrolled up, new messages don't move the list; the jump-to-latest button shows how many arrived.
-6. Tap 🔍 to search, or ••• for group info, members, the theme switcher and changing your name.
+6. Long-press a message to reply or copy it. Replies are sent as plain text with a quote line first, so they still read naturally in other clients:
+
+   ```text
+   > Alex: original message snippet
+   your reply
+   ```
+
+7. Tap 🔍 to search, or ••• for group info, members, the theme switcher and changing your name.
 
 ## Troubleshooting
 

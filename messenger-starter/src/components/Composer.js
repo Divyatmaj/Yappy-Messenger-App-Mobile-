@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { makeSnippet } from '../utils/reply';
 import { useThemedStyles, radius } from '../theme';
 
 const MAX_LENGTH = 2000;
@@ -10,6 +11,9 @@ export default function Composer({
   placeholder,
   me,
   onChangeName,
+  replyTo,
+  onCancelReply,
+  inputRef,
 }) {
   const { styles, colors } = useThemedStyles(makeStyles);
   const canSend = value.trim().length > 0;
@@ -17,8 +21,34 @@ export default function Composer({
 
   return (
     <View style={styles.container}>
+      {replyTo && (
+        <View style={styles.reply}>
+          <View style={styles.replyText}>
+            <Text style={styles.replyLabel} numberOfLines={1}>
+              Replying to{' '}
+              <Text style={styles.replyUser}>
+                {replyTo.user === me ? 'yourself' : replyTo.user}
+              </Text>
+            </Text>
+            <Text style={styles.replySnippet} numberOfLines={1}>
+              {makeSnippet(replyTo.text)}
+            </Text>
+          </View>
+          <Pressable
+            onPress={onCancelReply}
+            hitSlop={10}
+            style={styles.replyClose}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel reply"
+          >
+            <Text style={styles.replyCloseText}>✕</Text>
+          </Pressable>
+        </View>
+      )}
+
       <View style={styles.inputRow}>
         <TextInput
+          ref={inputRef}
           style={styles.input}
           placeholder={placeholder}
           placeholderTextColor={colors.textMuted}
@@ -80,6 +110,45 @@ const makeStyles = (colors) =>
       backgroundColor: colors.surface,
       borderTopWidth: 1,
       borderTopColor: colors.border,
+    },
+    reply: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderLeftWidth: 3,
+      borderLeftColor: colors.primary,
+      backgroundColor: colors.surfaceMuted,
+      borderRadius: 10,
+      paddingVertical: 7,
+      paddingLeft: 10,
+      paddingRight: 6,
+      marginBottom: 8,
+    },
+    replyText: {
+      flex: 1,
+    },
+    replyLabel: {
+      color: colors.textMuted,
+      fontSize: 12,
+    },
+    replyUser: {
+      color: colors.primary,
+      fontWeight: 'bold',
+    },
+    replySnippet: {
+      color: colors.text,
+      fontSize: 13,
+      marginTop: 2,
+    },
+    replyClose: {
+      width: 28,
+      height: 28,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    replyCloseText: {
+      color: colors.textMuted,
+      fontSize: 14,
+      fontWeight: 'bold',
     },
     inputRow: {
       flexDirection: 'row',

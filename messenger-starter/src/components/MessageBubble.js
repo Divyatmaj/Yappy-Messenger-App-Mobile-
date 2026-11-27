@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Avatar from './Avatar';
 import HighlightedText from './HighlightedText';
+import { parseReply } from '../utils/reply';
 import { useThemedStyles, colorForUser, radius } from '../theme';
 
 const AVATAR_SIZE = 32;
@@ -17,12 +18,15 @@ export default function MessageBubble({
   isLastInGroup,
   onRetry,
   onDiscard,
+  onLongPress,
+  onQuotePress,
   query = '',
   isActiveMatch = false,
 }) {
   const { styles, isDark } = useThemedStyles(makeStyles);
   const { status } = message;
   const failed = status === 'failed';
+  const { quote, body } = parseReply(message.text);
 
   return (
     <View>
@@ -42,8 +46,11 @@ export default function MessageBubble({
             <View style={styles.avatarSlot} />
           ))}
 
-        <View
-          style={[
+        <Pressable
+          onLongPress={onLongPress}
+          delayLongPress={280}
+          accessibilityHint="Long press for reply and copy"
+          style={({ pressed }) => [
             styles.bubble,
             isMine ? styles.mine : styles.others,
             isMine && !isLastInGroup && styles.mineContinued,
@@ -51,6 +58,7 @@ export default function MessageBubble({
             failed && styles.failed,
             !isMine && !isLastInGroup && styles.othersContinued,
             isActiveMatch && styles.activeMatch,
+            pressed && styles.pressed,
           ]}
         >
           {!isMine && isFirstInGroup && (
@@ -65,13 +73,43 @@ export default function MessageBubble({
             />
           )}
 
+          {quote && (
+            <Pressable
+              onPress={onQuotePress}
+              style={[
+                styles.quote,
+                isMine ? styles.myQuote : styles.otherQuote,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={`Reply to ${quote.user}. Show original`}
+            >
+              <Text
+                style={[
+                  styles.quoteUser,
+                  isMine
+                    ? styles.myText
+                    : { color: colorForUser(quote.user, isDark).fg },
+                ]}
+                numberOfLines={1}
+              >
+                {quote.user}
+              </Text>
+              <Text
+                style={[styles.quoteText, isMine && styles.myQuoteText]}
+                numberOfLines={2}
+              >
+                {quote.snippet}
+              </Text>
+            </Pressable>
+          )}
+
           <HighlightedText
-            text={message.text}
+            text={body}
             query={query}
             style={[styles.text, isMine && styles.myText]}
             highlightStyle={styles.highlight}
           />
-        </View>
+        </Pressable>
       </View>
 
       {status === 'sending' && <Text style={styles.statusText}>Sending…</Text>}
@@ -140,6 +178,38 @@ const makeStyles = (colors) =>
     activeMatch: {
       borderWidth: 2,
       borderColor: colors.activeMatch,
+    },
+    pressed: {
+      opacity: 0.85,
+    },
+    quote: {
+      borderLeftWidth: 3,
+      borderRadius: 8,
+      paddingHorizontal: 8,
+      paddingVertical: 5,
+      marginBottom: 6,
+      marginTop: 2,
+    },
+    myQuote: {
+      backgroundColor: 'rgba(255,255,255,0.16)',
+      borderLeftColor: 'rgba(255,255,255,0.7)',
+    },
+    otherQuote: {
+      backgroundColor: colors.surfaceMuted,
+      borderLeftColor: colors.primary,
+    },
+    quoteUser: {
+      fontSize: 12,
+      fontWeight: 'bold',
+    },
+    quoteText: {
+      color: colors.textMuted,
+      fontSize: 13,
+      lineHeight: 18,
+      marginTop: 1,
+    },
+    myQuoteText: {
+      color: 'rgba(255,255,255,0.85)',
     },
     highlight: {
       backgroundColor: colors.highlight,

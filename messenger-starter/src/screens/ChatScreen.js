@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import * as Clipboard from 'expo-clipboard';
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -19,15 +20,27 @@ import Composer from '../components/Composer';
 import GroupInfoSheet from '../components/GroupInfoSheet';
 import ConnectionBanner from '../components/ConnectionBanner';
 import JumpToLatestButton from '../components/JumpToLatestButton';
+import MessageActionsSheet from '../components/MessageActionsSheet';
 import MessageBubble from '../components/MessageBubble';
 import SearchBar from '../components/SearchBar';
+import Toast from '../components/Toast';
 import useMessages from '../hooks/useMessages';
 import { messageKey } from '../api';
+import {
+  longPressFeedback,
+  successFeedback,
+  tapFeedback,
+} from '../haptics';
+import { composeReply, isQuotedMessage, parseReply } from '../utils/reply';
 import { useThemedStyles } from '../theme';
 
 const GROUP_NAME = 'Scalar';
 // How close (in px) to the bottom still counts as "reading the latest".
 const NEAR_BOTTOM_PX = 80;
+// How long a message stays outlined after jumping to it from a reply.
+const FLASH_MS = 1600;
+
+let toastCounter = 0;
 
 function matchesQuery(message, q) {
   return (
@@ -50,13 +63,88 @@ export default function ChatScreen({ me, onChangeName }) {
   } = useMessages(me);
   const [text, setText] = useState('');
   const [infoOpen, setInfoOpen] = useState(false);
+  const [replyTo, setReplyTo] = useState(null);
+  const [actionTarget, setActionTarget] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [flashIndex, setFlashIndex] = useState(-1);
   const listRef = useRef(null);
+  const inputRef = useRef(null);
   const insets = useSafeAreaInsets();
 
+  const showToast = useCallback((toastText, extra = {}) => {
+    setToast({ id: ++toastCounter, text: toastText, ...extra });
+  }, []);
+
   const sendMessage = () => {
-    if (!text.trim()) return;
-    send(text);
+    const body = text.trim();
+    if (!body) return;
+    send(replyTo ? composeReply(replyTo, body) : body);
     setText('');
+    setReplyTo(null);
+    tapFeedback();
+  };
+
+  // ---- Message actions --------------------------------------------------
+  const openActions = (message) => {
+    longPressFeedback();
+    setActionTarget(message);
+  };
+
+  const startReply = (message) => {
+    setReplyTo(message);
+    // Wait for the actions sheet to close before focusing the input.
+    setTimeout(() => inputRef.current?.focus(), 250);
+  };
+
+  const copyMessage = async (message) => {
+    try {
+      await Clipboard.setStringAsync(parseReply(message.text).body);
+      successFeedback();
+      showToast('Copied to clipboard');
+    } catch {
+      showToast("Couldn't copy message");
+    }
+  };
+
+  const actionsFor = (message) => {
+    if (!message) return [];
+    if (message.status === 'failed') {
+      return [
+        {
+          key: 'retry',
+          icon: '↻',
+          label: 'Retry sending',
+          onPress: () => retry(message.localId),
+        },
+        {
+          key: 'copy',
+          icon: '⧉',
+          label: 'Copy text',
+          onPress: () => copyMessage(message),
+        },
+        {
+          key: 'delete',
+          icon: '🗑',
+          label: 'Delete',
+          destructive: true,
+          onPress: () => discard(message.localId),
+        },
+      ];
+    }
+    return [
+      {
+        key: 'reply',
+        icon: '↩',
+        label: 'Reply',
+        onPress: () => startReply(message),
+      },
+      {
+        key: 'copy',
+        icon: '⧉',
+        label: 'Copy text',
+        onPress: () => copyMessage(message),
+      },
+    ];
   };
 
   // ---- Search -----------------------------------------------------------
@@ -152,6 +240,28 @@ export default function ChatScreen({ me, onChangeName }) {
     scrollToLatest(true);
   };
 
+  // Tapping a quote scrolls to the newest earlier message it matches.
+  const flashTimer = useRef(null);
+  useEffect(() => () => clearTimeout(flashTimer.current), []);
+
+  const jumpToQuoted = (index) => {
+    const { quote } = parseReply(messages[index]?.text);
+    for (let i = index - 1; i >= 0; i--) {
+      if (isQuotedMessage(quote, messages[i])) {
+        listRef.current?.scrollToIndex({
+          index: i,
+          viewPosition: 0.5,
+          animated: true,
+        });
+        setFlashIndex(i);
+        clearTimeout(flashTimer.current);
+        flashTimer.current = setTimeout(() => setFlashIndex(-1), FLASH_MS);
+        return;
+      }
+    }
+    showToast('Original message is no longer available');
+  };
+
   // Item heights vary, so scrollToIndex may target an unmeasured row.
   // Scroll roughly there first so it gets rendered, then retry.
   const handleScrollToIndexFailed = ({ index, averageItemLength }) => {
@@ -183,8 +293,10 @@ export default function ChatScreen({ me, onChangeName }) {
         isLastInGroup={!next || next.user !== item.user}
         onRetry={() => retry(item.localId)}
         onDiscard={() => discard(item.localId)}
+        onLongPress={() => openActions(item)}
+        onQuotePress={() => jumpToQuoted(index)}
         query={normalizedQuery}
-        isActiveMatch={index === activeIndex}
+        isActiveMatch={index === activeIndex || index === flashIndex}
       />
     );
   };
@@ -233,7 +345,7 @@ export default function ChatScreen({ me, onChangeName }) {
             ref={listRef}
             style={styles.flex}
             data={messages}
-            extraData={`${normalizedQuery}|${activeIndex}`}
+            extraData={`${normalizedQuery}|${activeIndex}|${flashIndex}`}
             onScroll={handleScroll}
             scrollEventThrottle={100}
             onScrollToIndexFailed={handleScrollToIndexFailed}
@@ -259,6 +371,8 @@ export default function ChatScreen({ me, onChangeName }) {
             unreadCount={unread}
             onPress={jumpToLatest}
           />
+
+          <Toast toast={toast} onHide={() => setToast(null)} />
         </View>
 
         <View
@@ -274,9 +388,18 @@ export default function ChatScreen({ me, onChangeName }) {
             placeholder={`Message ${GROUP_NAME}...`}
             me={me}
             onChangeName={onChangeName}
+            replyTo={replyTo}
+            onCancelReply={() => setReplyTo(null)}
+            inputRef={inputRef}
           />
         </View>
       </KeyboardAvoidingView>
+
+      <MessageActionsSheet
+        message={actionTarget}
+        actions={actionsFor(actionTarget)}
+        onClose={() => setActionTarget(null)}
+      />
 
       <GroupInfoSheet
         visible={infoOpen}
