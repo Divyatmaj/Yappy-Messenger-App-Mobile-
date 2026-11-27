@@ -280,7 +280,16 @@ export default function ChatScreen({ me, onChangeName }) {
     }, 120);
   };
 
-  const participants = new Set(messages.map((m) => m.user).filter(Boolean));
+  // Everyone who has posted, most recently active first. Used for member
+  // counts, @mention highlighting and composer suggestions.
+  const members = useMemo(() => {
+    const seen = new Set();
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const user = messages[i].user?.trim();
+      if (user) seen.add(user);
+    }
+    return [...seen];
+  }, [messages]);
 
   const renderItem = ({ item, index }) => {
     const prev = messages[index - 1];
@@ -288,6 +297,8 @@ export default function ChatScreen({ me, onChangeName }) {
     return (
       <MessageBubble
         message={item}
+        me={me}
+        members={members}
         isMine={item.user === me}
         isFirstInGroup={!prev || prev.user !== item.user}
         isLastInGroup={!next || next.user !== item.user}
@@ -325,8 +336,8 @@ export default function ChatScreen({ me, onChangeName }) {
             subtitle={
               fromCache && online
                 ? 'Updating…'
-                : `${participants.size || 'No'} member${
-                    participants.size === 1 ? '' : 's'
+                : `${members.length || 'No'} member${
+                    members.length === 1 ? '' : 's'
                   } · Group conversation`
             }
             onSearchPress={() => setSearching(true)}
@@ -391,6 +402,7 @@ export default function ChatScreen({ me, onChangeName }) {
             replyTo={replyTo}
             onCancelReply={() => setReplyTo(null)}
             inputRef={inputRef}
+            members={members}
           />
         </View>
       </KeyboardAvoidingView>

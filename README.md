@@ -10,6 +10,8 @@ A group messaging mobile app built with Expo and React Native. Pick a display na
 - **Connection awareness** – offline banner with manual retry, loading state for slow server wake-ups, and an empty state
 - **Message actions** – long-press any message to reply or copy it (failed messages also offer retry/delete), with haptic feedback
 - **Replies** – quoted replies show the original sender and snippet; tap the quote to jump to the original message
+- **@mentions** – type `@` to pick a member from suggestions; mentions are highlighted, and messages that mention you get an accent outline
+- **Rich text** – links are tappable and open in the browser; messages of 1–3 emoji are shown large without a bubble
 - **Search** – find messages or people, with highlighted matches and next/previous navigation
 - **Jump to latest** – floating button with an unread counter when you've scrolled up
 - **Group info** – member list ranked by message count, plus group stats
@@ -46,7 +48,8 @@ Messenger/
         ├── storage.js              # AsyncStorage wrapper and persisted keys
         ├── theme.js                # Light/dark palettes, ThemeProvider, avatar colors
         ├── utils/
-        │   └── reply.js            # Encode/parse quoted replies
+        │   ├── reply.js            # Encode/parse quoted replies
+        │   └── richText.js         # Links, @mentions, emoji-only detection
         ├── hooks/
         │   ├── useAppActive.js     # Foreground/background state
         │   └── useMessages.js      # Polling, cache, optimistic send, retry, connection state
@@ -63,7 +66,9 @@ Messenger/
             ├── HighlightedText.js
             ├── JumpToLatestButton.js
             ├── MessageActionsSheet.js # Long-press menu
+            ├── MentionSuggestions.js # @mention autocomplete
             ├── MessageBubble.js
+            ├── RichText.js         # Links, mentions and search highlights
             ├── SearchBar.js
             └── Toast.js            # Floating notices
 ```
@@ -154,7 +159,8 @@ The `user` field is the display name chosen on the welcome screen. It is saved o
    your reply
    ```
 
-7. Tap 🔍 to search, or ••• for group info, members, the theme switcher and changing your name.
+7. Type `@` in the composer to mention someone who has posted in the group. Names can contain spaces; mentions are matched against known members, longest name first.
+8. Tap 🔍 to search, or ••• for group info, members, the theme switcher and changing your name.
 
 ## Troubleshooting
 

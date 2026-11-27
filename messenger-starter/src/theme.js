@@ -32,6 +32,8 @@ export const lightColors = {
   warningText: '#8A5300',
   warningDot: '#F59E0B',
   overlay: 'rgba(15, 18, 34, 0.45)',
+  mentionBg: '#E4E1FF',
+  mentionText: '#3F34C9',
 };
 
 export const darkColors = {
@@ -57,6 +59,8 @@ export const darkColors = {
   warningText: '#FFD58A',
   warningDot: '#F59E0B',
   overlay: 'rgba(0, 0, 0, 0.6)',
+  mentionBg: '#3A3570',
+  mentionText: '#D6D2FF',
 };
 
 export const radius = {

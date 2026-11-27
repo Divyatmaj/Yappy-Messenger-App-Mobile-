@@ -1,5 +1,8 @@
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import MentionSuggestions from './MentionSuggestions';
 import { makeSnippet } from '../utils/reply';
+import { findMentionQuery, suggestMembers } from '../utils/richText';
 import { useThemedStyles, radius } from '../theme';
 
 const MAX_LENGTH = 2000;
@@ -14,10 +17,30 @@ export default function Composer({
   replyTo,
   onCancelReply,
   inputRef,
+  members = [],
 }) {
   const { styles, colors } = useThemedStyles(makeStyles);
   const canSend = value.trim().length > 0;
   const nearLimit = value.length > MAX_LENGTH - 200;
+
+  // ---- @mention autocomplete ----------------------------------------------
+  const [cursor, setCursor] = useState(0);
+  // Position of an "@" whose suggestions were used or dismissed, so they
+  // don't pop up again for the mention that was just inserted.
+  const [dismissedAt, setDismissedAt] = useState(-1);
+  const mention = findMentionQuery(value, Math.min(cursor, value.length));
+  const suggestions =
+    mention && mention.start !== dismissedAt
+      ? suggestMembers(members, mention.query, me)
+      : [];
+
+  const pickMention = (name) => {
+    const end = mention.start + 1 + mention.query.length;
+    const inserted = `@${name} `;
+    onChangeText(value.slice(0, mention.start) + inserted + value.slice(end));
+    setDismissedAt(mention.start);
+    setCursor(mention.start + inserted.length);
+  };
 
   return (
     <View style={styles.container}>
@@ -46,6 +69,8 @@ export default function Composer({
         </View>
       )}
 
+      <MentionSuggestions names={suggestions} onPick={pickMention} />
+
       <View style={styles.inputRow}>
         <TextInput
           ref={inputRef}
@@ -54,6 +79,9 @@ export default function Composer({
           placeholderTextColor={colors.textMuted}
           value={value}
           onChangeText={onChangeText}
+          onSelectionChange={({ nativeEvent }) =>
+            setCursor(nativeEvent.selection.end)
+          }
           multiline
           maxLength={MAX_LENGTH}
         />

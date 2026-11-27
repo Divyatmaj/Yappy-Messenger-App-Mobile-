@@ -1,7 +1,9 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Avatar from './Avatar';
 import HighlightedText from './HighlightedText';
+import RichText from './RichText';
 import { parseReply } from '../utils/reply';
+import { isEmojiOnly, mentionsUser } from '../utils/richText';
 import { useThemedStyles, colorForUser, radius } from '../theme';
 
 const AVATAR_SIZE = 32;
@@ -13,6 +15,8 @@ const AVATAR_SIZE = 32;
  */
 export default function MessageBubble({
   message,
+  me,
+  members,
   isMine,
   isFirstInGroup,
   isLastInGroup,
@@ -27,6 +31,9 @@ export default function MessageBubble({
   const { status } = message;
   const failed = status === 'failed';
   const { quote, body } = parseReply(message.text);
+  // A short all-emoji message is shown large, without a bubble.
+  const bigEmoji = !quote && !failed && isEmojiOnly(body);
+  const mentionsMe = !isMine && mentionsUser(body, me);
 
   return (
     <View>
@@ -57,6 +64,8 @@ export default function MessageBubble({
             status === 'sending' && styles.sending,
             failed && styles.failed,
             !isMine && !isLastInGroup && styles.othersContinued,
+            mentionsMe && styles.mentioned,
+            bigEmoji && styles.emojiBubble,
             isActiveMatch && styles.activeMatch,
             pressed && styles.pressed,
           ]}
@@ -103,10 +112,19 @@ export default function MessageBubble({
             </Pressable>
           )}
 
-          <HighlightedText
+          <RichText
             text={body}
+            members={members}
+            me={me}
             query={query}
-            style={[styles.text, isMine && styles.myText]}
+            style={[
+              styles.text,
+              isMine && styles.myText,
+              bigEmoji && styles.emojiText,
+            ]}
+            linkStyle={isMine ? styles.myLink : styles.link}
+            mentionStyle={isMine ? styles.myMention : styles.mention}
+            mentionMeStyle={styles.mentionMe}
             highlightStyle={styles.highlight}
           />
         </Pressable>
@@ -181,6 +199,41 @@ const makeStyles = (colors) =>
     },
     pressed: {
       opacity: 0.85,
+    },
+    mentioned: {
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+    },
+    emojiBubble: {
+      backgroundColor: 'transparent',
+      borderWidth: 0,
+      paddingHorizontal: 2,
+      paddingVertical: 0,
+    },
+    emojiText: {
+      fontSize: 42,
+      lineHeight: 52,
+    },
+    link: {
+      color: colors.primary,
+      textDecorationLine: 'underline',
+    },
+    myLink: {
+      color: colors.onPrimary,
+      textDecorationLine: 'underline',
+      fontWeight: '600',
+    },
+    mention: {
+      color: colors.primary,
+      fontWeight: 'bold',
+    },
+    myMention: {
+      color: colors.onPrimary,
+      fontWeight: 'bold',
+    },
+    mentionMe: {
+      backgroundColor: colors.mentionBg,
+      color: colors.mentionText,
     },
     quote: {
       borderLeftWidth: 3,
