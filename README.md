@@ -8,6 +8,8 @@ A group messaging mobile app built with Expo, React Native and Firebase. Pick a 
 
 - **Multiple chats** – a WhatsApp-style **Chats** home screen lists every conversation you're in, with the last message, time and an unread dot
 - **Public group** – everyone automatically joins the **Scalar** group
+- **Direct messages** – tap ＋ on the Chats screen and pick anyone from the searchable people list; each pair of people has exactly one chat
+- **Groups** – ＋ → **New group**: pick members, name it, done. In a group's info you can add people, rename the group or leave it. Tap any member to message them directly
 - **Welcome screen** – choose a display name (2–20 characters); change it any time from Settings
 - **Polished chat UI** – per-user avatar colors, grouped consecutive messages, auto-scroll to the latest message
 - **Optimistic sending** – messages appear instantly with a *Sending…* state; failed sends can be retried or deleted
@@ -60,7 +62,7 @@ Messenger/
     ├── package.json                   # Dependencies and scripts
     └── src/
         ├── api.js                     # Firestore: a chat's messages (subscribe, post)
-        ├── chats.js                   # Firestore: users directory, chats, public group
+        ├── chats.js                   # Firestore: users, chats, DMs, groups, public group
         ├── firebase.js                # Firebase app, anonymous auth, Firestore, error hints
         ├── firebaseConfig.js          # Your Firebase web app config (paste here)
         ├── haptics.js                 # Safe haptic feedback helpers
@@ -77,7 +79,8 @@ Messenger/
         │   └── useUsers.js            # People directory provider
         ├── screens/
         │   ├── ChatScreen.js          # One conversation: search, scrolling, actions, alerts
-        │   ├── ChatsScreen.js         # Home: list of your chats
+        │   ├── ChatsScreen.js         # Home: list of your chats, ＋ button
+        │   ├── NewChatScreen.js       # Start a DM or create a group
         │   └── WelcomeScreen.js       # Display-name picker
         ├── utils/
         │   ├── reply.js               # Encode/parse quoted replies
@@ -90,13 +93,14 @@ Messenger/
             ├── ChatPlaceholder.js     # Loading / empty states
             ├── Composer.js            # Message input, reply bar, mention suggestions
             ├── ConnectionBanner.js    # Offline notice
-            ├── GroupInfoSheet.js      # Chat members and stats
+            ├── GroupInfoSheet.js      # Members and stats; add people, rename, leave
             ├── HighlightedText.js     # Search-match highlighting
             ├── JumpToLatestButton.js
             ├── MentionSuggestions.js  # @mention autocomplete list
             ├── MessageActionsSheet.js # Long-press menu
             ├── MessageBubble.js
             ├── NewMessagesDivider.js
+            ├── PeoplePicker.js        # Searchable people list (single or multi-select)
             ├── RichText.js            # Links, mentions and search highlights
             ├── SearchBar.js
             ├── SettingsSheet.js       # Profile, theme, change name
@@ -194,7 +198,7 @@ Tapping **Change** next to your name, or **Change display name** in Settings, re
 6. Long-press a message to reply or copy it. Tap the quote in a reply to jump to the original message.
 7. Type `@` in the composer to mention a member of the chat. Names can contain spaces; mentions are matched against known members, longest name first.
 8. The app saves the last message you've seen. On your next visit, unread messages from others start below a *New messages* divider and the chat opens there.
-9. In a chat, tap 🔍 to search or the header for chat info and members. On the Chats screen, ⚙︎ opens Settings (theme, display name). The Android back button returns to the chat list.
+9. Tap ＋ on the Chats screen to message someone or create a group. In a chat, tap 🔍 to search or the header for chat info and members. On the Chats screen, ⚙︎ opens Settings (theme, display name). The Android back button returns to the chat list.
 
 ## Roadmap: push notifications
 

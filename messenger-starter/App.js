@@ -3,6 +3,7 @@ import { BackHandler, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import ChatScreen from './src/screens/ChatScreen';
 import ChatsScreen from './src/screens/ChatsScreen';
+import NewChatScreen from './src/screens/NewChatScreen';
 import WelcomeScreen from './src/screens/WelcomeScreen';
 import { joinPublicGroup, saveProfile } from './src/chats';
 import { describeFirebaseError, ensureSignedIn } from './src/firebase';
@@ -28,7 +29,7 @@ function Root() {
   const [lastName, setLastName] = useState('');
   const [uid, setUid] = useState(null);
   const [problem, setProblem] = useState(null);
-  // Which screen is showing: the chat list, or one chat.
+  // Which screen is showing: the chat list, one chat, or "new chat".
   const [route, setRoute] = useState({ name: 'chats' });
 
   useEffect(() => {
@@ -76,13 +77,15 @@ function Root() {
     [],
   );
   const goHome = useCallback(() => setRoute({ name: 'chats' }), []);
+  const startNewChat = useCallback(() => setRoute({ name: 'new' }), []);
 
   // Android back button: from a chat, go back to the chat list.
+  // (The new-chat screen handles its own steps.)
   useEffect(() => {
     const subscription = BackHandler.addEventListener(
       'hardwareBackPress',
       () => {
-        if (route.name === 'chats') return false;
+        if (route.name === 'chats' || route.name === 'new') return false;
         goHome();
         return true;
       },
@@ -113,9 +116,16 @@ function Root() {
             chatId={route.chatId}
             initialChat={route.chat}
             onBack={goHome}
+            onOpenChat={openChat}
           />
+        ) : route.name === 'new' ? (
+          <NewChatScreen onBack={goHome} onOpenChat={openChat} />
         ) : (
-          <ChatsScreen problem={problem} onOpenChat={openChat} />
+          <ChatsScreen
+            problem={problem}
+            onOpenChat={openChat}
+            onNewChat={startNewChat}
+          />
         )}
       </UsersProvider>
     </SessionContext.Provider>

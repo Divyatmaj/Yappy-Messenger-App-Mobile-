@@ -25,7 +25,14 @@ import MessageBubble from '../components/MessageBubble';
 import NewMessagesDivider from '../components/NewMessagesDivider';
 import SearchBar from '../components/SearchBar';
 import Toast from '../components/Toast';
-import { chatTitle } from '../chats';
+import {
+  addGroupMembers,
+  canManage,
+  chatTitle,
+  leaveGroup,
+  openDirectChat,
+  renameGroup,
+} from '../chats';
 import { useChat } from '../hooks/useChats';
 import useIncomingMessages from '../hooks/useIncomingMessages';
 import useMessages from '../hooks/useMessages';
@@ -66,10 +73,15 @@ function matchesQuery(message, q) {
   );
 }
 
-export default function ChatScreen({ chatId, initialChat, onBack }) {
+export default function ChatScreen({
+  chatId,
+  initialChat,
+  onBack,
+  onOpenChat,
+}) {
   const { styles, colors } = useThemedStyles(makeStyles);
   const { me, uid, changeName } = useSession();
-  const { usersById } = useUsers();
+  const { users, usersById } = useUsers();
   const chat = useChat(chatId, initialChat);
   const title = chatTitle(chat, uid, usersById);
   const isGroup = chat?.type !== 'direct';
@@ -565,6 +577,19 @@ export default function ChatScreen({ chatId, initialChat, onBack }) {
         usersById={usersById}
         messages={messages}
         uid={uid}
+        people={users}
+        canManage={canManage(chat)}
+        onMessageMember={(otherUid) =>
+          openDirectChat(uid, otherUid)
+            .then(onOpenChat)
+            .catch((error) => {
+              console.log('Error opening chat:', error);
+              showToast("Couldn't open the chat");
+            })
+        }
+        onAddMembers={(ids) => addGroupMembers(chatId, ids)}
+        onRename={(name) => renameGroup(chatId, name)}
+        onLeave={() => leaveGroup(chatId, uid).then(onBack)}
       />
     </SafeAreaView>
   );

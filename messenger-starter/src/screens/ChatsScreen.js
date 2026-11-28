@@ -8,7 +8,10 @@ import {
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 
 import ChatListItem from '../components/ChatListItem';
 import SettingsSheet from '../components/SettingsSheet';
@@ -20,13 +23,18 @@ import { useSession } from '../session';
 import { useThemedStyles } from '../theme';
 
 /** Home screen: every conversation you're in, most recent first. */
-export default function ChatsScreen({ problem: sessionProblem, onOpenChat }) {
+export default function ChatsScreen({
+  problem: sessionProblem,
+  onOpenChat,
+  onNewChat,
+}) {
   const { styles, colors } = useThemedStyles(makeStyles);
   const { me, uid } = useSession();
   const { usersById } = useUsers();
   const { chats, problem: chatsProblem } = useMyChats(uid);
   const [readMarks, setReadMarks] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const insets = useSafeAreaInsets();
   const problem = sessionProblem ?? chatsProblem;
 
   useEffect(() => subscribeReadMarks(setReadMarks), []);
@@ -89,12 +97,27 @@ export default function ChatsScreen({ problem: sessionProblem, onOpenChat }) {
                 <Text style={styles.emoji}>💬</Text>
                 <Text style={styles.emptyTitle}>No chats yet</Text>
                 <Text style={styles.emptyBody}>
-                  Joining the Scalar group…
+                  Tap ＋ to start a chat or create a group.
                 </Text>
               </View>
             }
             contentContainerStyle={styles.listContent}
           />
+        )}
+
+        {uid && (
+          <Pressable
+            style={({ pressed }) => [
+              styles.fab,
+              { bottom: insets.bottom + 20 },
+              pressed && styles.fabPressed,
+            ]}
+            onPress={onNewChat}
+            accessibilityRole="button"
+            accessibilityLabel="New chat"
+          >
+            <Text style={styles.fabText}>＋</Text>
+          </Pressable>
         )}
       </View>
 
@@ -153,7 +176,32 @@ const makeStyles = (colors) =>
     },
     listContent: {
       flexGrow: 1,
-      paddingVertical: 6,
+      paddingTop: 6,
+      paddingBottom: 100,
+    },
+    fab: {
+      position: 'absolute',
+      right: 20,
+      width: 58,
+      height: 58,
+      borderRadius: 20,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      elevation: 6,
+      shadowColor: '#000',
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+    },
+    fabPressed: {
+      transform: [{ scale: 0.94 }],
+    },
+    fabText: {
+      color: colors.onPrimary,
+      fontSize: 28,
+      fontWeight: 'bold',
+      marginTop: -2,
     },
     center: {
       flex: 1,

@@ -1,4 +1,5 @@
 import {
+  arrayRemove,
   arrayUnion,
   collection,
   doc,
@@ -117,6 +118,85 @@ export async function joinPublicGroup(uid) {
   }
   await updateDoc(ref, { members: arrayUnion(uid) });
 }
+
+/** The one-to-one chat id for two people (the same from either side). */
+export function directChatId(uidA, uidB) {
+  return `dm_${[uidA, uidB].sort().join('_')}`;
+}
+
+/** Opens your chat with `otherUid`, creating it the first time. */
+export async function openDirectChat(uid, otherUid) {
+  const id = directChatId(uid, otherUid);
+  const ref = doc(db, 'chats', id);
+  const snapshot = await getDoc(ref);
+  if (snapshot.exists()) return toChat(snapshot);
+
+  const members = [uid, otherUid].sort();
+  await setDoc(ref, {
+    type: 'direct',
+    members,
+    createdBy: uid,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return {
+    id,
+    type: 'direct',
+    name: null,
+    members,
+    public: false,
+    updatedAt: Date.now(),
+    lastMessage: null,
+  };
+}
+
+/** Creates a private group with you and `memberIds` in it. */
+export async function createGroup(uid, name, memberIds) {
+  const ref = doc(collection(db, 'chats'));
+  const members = [...new Set([uid, ...memberIds])];
+  await setDoc(ref, {
+    type: 'group',
+    name,
+    members,
+    createdBy: uid,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return {
+    id: ref.id,
+    type: 'group',
+    name,
+    members,
+    public: false,
+    updatedAt: Date.now(),
+    lastMessage: null,
+  };
+}
+
+export function addGroupMembers(chatId, memberIds) {
+  return updateDoc(doc(db, 'chats', chatId), {
+    members: arrayUnion(...memberIds),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export function renameGroup(chatId, name) {
+  return updateDoc(doc(db, 'chats', chatId), {
+    name,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export function leaveGroup(chatId, uid) {
+  return updateDoc(doc(db, 'chats', chatId), {
+    members: arrayRemove(uid),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/** Whether members may rename the chat and add/remove people. */
+export const canManage = (chat) =>
+  chat?.type === 'group' && chat.public !== true;
 
 // ---- Display helpers -------------------------------------------------------
 
