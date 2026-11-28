@@ -31,3 +31,12 @@ yarn-error.*
 *.key
 *.mobileprovision
 *.pem
+
+# Firebase / Google Cloud service-account private keys. Never commit these:
+# they grant admin access to the project. Upload them with `eas credentials`.
+# (google-services.json is NOT a secret and must stay committed.)
+*firebase-adminsdk*.json
+*-adminsdk-*.json
+*service-account*.json
+*service_account*.json
+*serviceAccount*.json
