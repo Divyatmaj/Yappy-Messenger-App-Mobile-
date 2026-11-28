@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "907882227851",
+    "project_id": "yappy-messenger",
+    "storage_bucket": "yappy-messenger.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:907882227851:android:ff33fe5d8ffa79993a0c8e",
+        "android_client_info": {
+          "package_name": "com.divyatmaj.yappy"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDHACz7xow5ryeoKtjuN95H6Bfi3ggH4Dg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

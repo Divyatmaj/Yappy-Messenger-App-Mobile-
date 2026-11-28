@@ -67,6 +67,7 @@ export default function ChatScreen({ me, onChangeName }) {
     loaded,
     online,
     fromCache,
+    problem,
     send,
     retry,
     discard,
@@ -451,6 +452,7 @@ export default function ChatScreen({ me, onChangeName }) {
         <ConnectionBanner
           visible={!online}
           showingSaved={fromCache}
+          problem={problem}
           onRetry={refresh}
         />
 
@@ -478,7 +480,11 @@ export default function ChatScreen({ me, onChangeName }) {
               ) : null
             }
             ListEmptyComponent={
-              <ChatPlaceholder loading={!loaded} groupName={GROUP_NAME} />
+              <ChatPlaceholder
+                loading={!loaded && !problem}
+                problem={problem}
+                groupName={GROUP_NAME}
+              />
             }
             contentContainerStyle={styles.messagesContent}
             showsVerticalScrollIndicator={false}

@@ -1,26 +1,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { fetchMessages, postMessage } from '../api';
+import { MESSAGE_LIMIT, postMessage, subscribeMessages } from '../api';
+import {
+  describeFirebaseError,
+  ensureSignedIn,
+  isFirebaseConfigured,
+} from '../firebase';
 import useAppActive from './useAppActive';
 import { KEYS, load, save } from '../storage';
-
-const POLL_INTERVAL_MS = 2000;
-// Enough history to fill the screen instantly on the next launch.
-const CACHE_LIMIT = 200;
 
 let localIdCounter = 0;
 
 /**
- * Loads the conversation, polls for updates and sends messages optimistically.
+ * Keeps the conversation in sync with Firestore in real time and sends
+ * messages optimistically.
  *
  * `messages` merges server messages with local ones that are still
  * sending or have failed; local messages carry `localId` and `status`.
- * `loaded` turns true after the first successful response; `online` is
- * false while the most recent request failed. `fromCache` is true while
- * the list shows messages saved on a previous launch and the server has
- * not answered yet.
+ * `loaded` turns true after the first response from the server; `online`
+ * is false when the server can't be reached. `fromCache` is true while the
+ * list shows messages saved on a previous launch. `problem` is a readable
+ * setup error (e.g. Firebase not configured), or null.
  *
- * Polling pauses while the app is in the background and refreshes as soon
- * as it comes back to the foreground.
+ * The listener is paused while the app is in the background and resumes
+ * when it returns to the foreground.
  */
 export default function useMessages(me) {
   const [serverMessages, setServerMessages] = useState([]);
@@ -28,46 +30,20 @@ export default function useMessages(me) {
   const [loaded, setLoaded] = useState(false);
   const [online, setOnline] = useState(true);
   const [fromCache, setFromCache] = useState(false);
+  const [problem, setProblem] = useState(() =>
+    isFirebaseConfigured
+      ? null
+      : describeFirebaseError({ code: 'not-configured' }),
+  );
+  const [attempt, setAttempt] = useState(0);
   const appActive = useAppActive();
-  const inFlight = useRef(false);
   const lastPayload = useRef('');
-  const requestSeq = useRef(0);
-  const appliedSeq = useRef(0);
-
-  const refresh = useCallback(async (force = false) => {
-    // The backend can be slow to wake up; don't stack polling requests.
-    if (inFlight.current && !force) return false;
-    inFlight.current = true;
-    const seq = ++requestSeq.current;
-    try {
-      const data = await fetchMessages();
-      // Ignore a slow response that was overtaken by a newer one.
-      if (seq < appliedSeq.current) return true;
-      appliedSeq.current = seq;
-      const payload = JSON.stringify(data);
-      // Skip re-rendering when nothing changed since the last poll.
-      if (payload !== lastPayload.current) {
-        lastPayload.current = payload;
-        setServerMessages(data);
-        save(KEYS.messageCache, data.slice(-CACHE_LIMIT));
-      }
-      setFromCache(false);
-      setLoaded(true);
-      setOnline(true);
-      return true;
-    } catch (error) {
-      console.log('Error loading messages:', error);
-      setOnline(false);
-      return false;
-    } finally {
-      inFlight.current = false;
-    }
-  }, []);
+  const gotServerData = useRef(false);
 
   // Show the last saved conversation until the server answers.
   useEffect(() => {
     load(KEYS.messageCache, []).then((cached) => {
-      if (appliedSeq.current > 0 || !Array.isArray(cached)) return;
+      if (gotServerData.current || !Array.isArray(cached)) return;
       if (cached.length === 0) return;
       setServerMessages(cached);
       setFromCache(true);
@@ -75,11 +51,48 @@ export default function useMessages(me) {
   }, []);
 
   useEffect(() => {
-    if (!appActive) return;
-    refresh(true);
-    const interval = setInterval(refresh, POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [refresh, appActive]);
+    if (!appActive || !isFirebaseConfigured) return;
+    let cancelled = false;
+    let unsubscribe = null;
+
+    const fail = (error) => {
+      console.log('Error syncing messages:', error);
+      if (cancelled) return;
+      setOnline(false);
+      setProblem(describeFirebaseError(error));
+    };
+
+    ensureSignedIn()
+      .then(() => {
+        if (cancelled) return;
+        unsubscribe = subscribeMessages((messages, meta) => {
+          // Firestore first answers from its (empty) local cache; only a
+          // server answer counts as loaded/online.
+          if (meta.fromCache) {
+            if (gotServerData.current) setOnline(false);
+            return;
+          }
+          gotServerData.current = true;
+          const payload = JSON.stringify(messages);
+          // Skip re-rendering when only metadata changed.
+          if (payload !== lastPayload.current) {
+            lastPayload.current = payload;
+            setServerMessages(messages);
+            save(KEYS.messageCache, messages.slice(-MESSAGE_LIMIT));
+          }
+          setFromCache(false);
+          setLoaded(true);
+          setOnline(true);
+          setProblem(null);
+        }, fail);
+      })
+      .catch(fail);
+
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
+  }, [appActive, attempt]);
 
   const deliver = useCallback(
     async (localId, text) => {
@@ -90,12 +103,11 @@ export default function useMessages(me) {
       );
       try {
         await postMessage(me, text);
-        // Wait for the server copy to arrive before dropping the local one,
-        // so the bubble doesn't blink out and back in.
-        await refresh(true);
+        // The listener delivers the stored copy at the same time.
         setPending((list) => list.filter((m) => m.localId !== localId));
       } catch (error) {
         console.log('Error sending message:', error);
+        setProblem(describeFirebaseError(error));
         setPending((list) =>
           list.map((m) =>
             m.localId === localId ? { ...m, status: 'failed' } : m,
@@ -103,7 +115,7 @@ export default function useMessages(me) {
         );
       }
     },
-    [me, refresh],
+    [me],
   );
 
   const send = useCallback(
@@ -137,16 +149,18 @@ export default function useMessages(me) {
     [serverMessages, pending],
   );
 
-  const refreshNow = useCallback(() => refresh(true), [refresh]);
+  // Re-create the listener (used by the offline banner's "Retry now").
+  const refresh = useCallback(() => setAttempt((n) => n + 1), []);
 
   return {
     messages,
     loaded,
-    online,
+    online: online && !problem,
     fromCache,
+    problem,
     send,
     retry,
     discard,
-    refresh: refreshNow,
+    refresh,
   };
 }

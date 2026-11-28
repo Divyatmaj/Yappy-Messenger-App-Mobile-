@@ -1,6 +1,6 @@
 # Yappy Messenger
 
-A group messaging mobile app built with Expo and React Native. Pick a display name, join the Scalar group conversation, and chat in real time with a polished light or dark UI.
+A group messaging mobile app built with Expo, React Native and Firebase. Pick a display name, join the Scalar group conversation, and chat in real time with a polished light or dark UI.
 
 ## Features
 
@@ -21,21 +21,22 @@ A group messaging mobile app built with Expo and React Native. Pick a display na
 - **In-app alerts** – when a message arrives while you're scrolled up, a tappable toast shows who sent it; mentions of you get their own alert that jumps straight to the message
 - **Jump to latest** – floating button with an unread counter (and an `@` badge if you were mentioned) when you've scrolled up
 - **Search** – find messages or people, with highlighted matches and next/previous navigation
-- **Connection awareness** – offline banner with manual retry, loading state for slow server wake-ups, and an empty state
-- Automatic refresh every two seconds, without overlapping requests
+- **Real-time sync** – messages arrive instantly through a Firestore listener (no polling)
+- **Connection awareness** – offline banner with manual retry, setup hints when Firebase isn't configured, loading and empty states
 
 ### Personalization & device
 
 - **Remembers you** – your display name, theme choice and the latest 200 messages are saved on the device, so the app opens straight into the chat and shows saved messages even when offline
 - **Dark mode** – follow the system theme or force light/dark from the group info sheet
 - **Group info** – member list ranked by message count, plus group stats
-- **Battery friendly** – polling pauses while the app is in the background and refreshes as soon as you return
+- **Battery friendly** – the Firestore listener pauses while the app is in the background and resumes as soon as you return
 - Keyboard-aware, safe-area-aware layout on iOS and Android
 
 ## Tech Stack
 
 - [Expo](https://expo.dev/) SDK 58
 - [React Native](https://reactnative.dev/) 0.88 with React 19
+- [Firebase](https://firebase.google.com/) JS SDK – Cloud Firestore for messages, Anonymous Authentication
 - `react-native-safe-area-context` – safe-area insets
 - `expo-status-bar` – status bar styling
 - `@react-native-async-storage/async-storage` – on-device persistence
@@ -49,20 +50,23 @@ All of these work in Expo Go, so no custom native build is needed yet.
 ```text
 Messenger/
 ├── README.md
+├── firestore.rules                    # Firestore security rules (paste into the console)
 └── messenger-starter/
     ├── App.js                         # Root: restores saved name/theme, welcome/chat switch
     ├── app.json                       # Expo config (name, bundle IDs, deep-link scheme)
     ├── index.js                       # Expo entry point
     ├── package.json                   # Dependencies and scripts
     └── src/
-        ├── api.js                     # Backend calls (GET/POST /messages)
+        ├── api.js                     # Firestore: subscribe to, read and post messages
+        ├── firebase.js                # Firebase app, anonymous auth, Firestore, error hints
+        ├── firebaseConfig.js          # Your Firebase web app config (paste here)
         ├── haptics.js                 # Safe haptic feedback helpers
         ├── storage.js                 # AsyncStorage wrapper and persisted keys
         ├── theme.js                   # Light/dark palettes, ThemeProvider, avatar colors
         ├── hooks/
         │   ├── useAppActive.js        # Foreground/background state
         │   ├── useIncomingMessages.js # Detects newly arrived messages from others
-        │   ├── useMessages.js         # Polling, cache, optimistic send, retry, connection state
+        │   ├── useMessages.js         # Real-time listener, cache, optimistic send, retry, connection state
         │   └── useReadState.js        # Last-read position and New messages divider
         ├── screens/
         │   ├── ChatScreen.js          # Conversation, search, scrolling, actions, alerts
@@ -114,57 +118,38 @@ npm run web
 
 `npm run ios` requires macOS with Xcode configured. The Android command requires an Android emulator or a connected device.
 
-## Backend API
+## Firebase setup
 
-The app uses the deployed API at:
+Messages are stored in **Cloud Firestore**, and every device signs in with **Firebase Anonymous Authentication**. Everything runs on the free **Spark** plan; there is no server to run.
 
-```text
-https://messenger-yzgf.onrender.com/
-```
+1. In the [Firebase console](https://console.firebase.google.com/), create a project (Google Analytics is optional).
+2. **Firestore:** *Build → Firestore Database → Create database*. Pick a location near you and start in **production mode**.
+3. **Rules:** open the *Rules* tab, replace everything with the contents of [`firestore.rules`](firestore.rules), and click **Publish**.
+4. **Anonymous sign-in:** *Build → Authentication → Get started → Sign-in method → Anonymous → Enable*.
+5. **Web app config:** *Project settings → General → Your apps → Add app → Web (`</>`)*. Register it (Firebase Hosting isn't needed), copy the `firebaseConfig` values into `messenger-starter/src/firebaseConfig.js`, then restart Expo.
 
-> **Status:** as of 27 November 2026 this service responds with *"This service has been suspended by its owner"* (HTTP 503). Until it is resumed or replaced, the app shows the offline banner and only saved messages. To use another server, change `API_URL` in `src/api.js`.
+Until steps 2–5 are done, the chat shows a *Setup needed* message saying what is missing.
 
-It expects these endpoints:
+### Data model
 
-### Get messages
-
-```http
-GET /messages
-```
-
-The response should be a JSON array. Each message is expected to contain:
+`messages/{autoId}`
 
 ```json
 {
-  "id": 1,
   "user": "Alex",
-  "text": "Hello!"
+  "text": "Hello!",
+  "uid": "<anonymous auth uid>",
+  "createdAt": "<server timestamp>"
 }
 ```
 
-The app also accepts `_id` instead of `id` for list keys. If neither is present, the message's position in the list is used.
+The app listens to the latest 200 messages ordered by `createdAt`. On the Spark plan, Firestore allows 50,000 document reads per day, and each app open reads up to 200, which is plenty for a class group.
 
-### Send a message
-
-```http
-POST /messages
-Content-Type: application/json
-```
-
-Request body:
-
-```json
-{
-  "user": "Newton",
-  "text": "Hello from Yappy!"
-}
-```
-
-The `user` field is the display name chosen on the welcome screen.
+The security rules allow signed-in clients to read and create messages with exactly these fields and a server timestamp. Messages can't be edited or deleted. The `devices` collection in the rules is used for push notifications.
 
 ### Text conventions
 
-The backend only stores `user` and `text`, so replies and mentions are written into the text in a form that still reads naturally in other clients:
+Each message only stores `user` and `text`, so replies and mentions are written into the text in a form that still reads naturally anywhere:
 
 | Feature | Format in `text` |
 | --- | --- |
@@ -188,8 +173,8 @@ Tapping **Change** next to your name, or using **Change display name** in group 
 ## How It Works
 
 1. On first launch you choose a display name on the welcome screen. Later launches go straight to the chat.
-2. Saved messages from the last session appear immediately. The chat screen then polls `GET /messages` every two seconds. A poll is skipped while the previous one is still in flight, stale responses are ignored, and polling stops while the app is in the background.
-3. Sending adds the message locally right away (*Sending…*) and calls `POST /messages`. On success the local copy is replaced by the server copy; on failure it is marked *Not sent* with **Retry** and **Delete** options.
+2. Saved messages from the last session appear immediately. The chat screen then signs in anonymously and opens a real-time Firestore listener, which is paused while the app is in the background.
+3. Sending adds the message locally right away (*Sending…*) and writes it to Firestore. Once the server confirms it, the local copy is replaced by the stored one. While offline, Firestore queues the write and sends it when the connection returns. If the write is rejected, the message is marked *Not sent* with **Retry** and **Delete** options.
 4. Messages whose `user` matches your display name appear on the right; others appear on the left with a sender name and colored avatar.
 5. If you've scrolled up, new messages don't move the list; the jump-to-latest button shows how many arrived, and a tappable alert shows who sent them.
 6. Long-press a message to reply or copy it. Tap the quote in a reply to jump to the original message.
@@ -199,28 +184,20 @@ Tapping **Change** next to your name, or using **Change display name** in group 
 
 ## Roadmap: push notifications
 
-The app is set up for push notifications (Expo Notifications + EAS Build + Firebase Cloud Messaging):
+Next step: Android push notifications with **Expo Notifications**, delivered through **Firebase Cloud Messaging**, with builds made using **EAS**. They will work without a server:
 
-- `app.json` already defines the app identity (`com.divyatmaj.yappy`) and a `yappy://` deep-link scheme.
-- `src/storage.js` is the place to keep the push token and notification preferences.
-- `useAppActive` tells foreground from background, so in-app alerts can be used in the foreground and system notifications in the background.
-- `useIncomingMessages` is the single place that detects new messages, and `mentionsUser()` in `src/utils/richText.js` can decide when to send a mention notification.
-- `useReadState` provides the last-read position for unread badge counts.
+- Each device saves its Expo push token in the Firestore `devices` collection (already allowed by `firestore.rules`).
+- After a message is stored, the sender's app sends notifications to the other devices through Expo's push service. Devices can choose *all messages*, *mentions only* or *off*.
+- `useAppActive`, `useIncomingMessages`, `mentionsUser()` and `useReadState` are already in place for foreground handling, mention detection and badges.
 
-Still needed:
-
-- A backend that stores each device's Expo push token and calls the Expo Push API when a message is posted
-- An Expo account and EAS project (`eas init`), and a Firebase project for Android (FCM)
-- A development build, because Expo Go doesn't support remote push notifications on Android
+Still needed: an Expo account and EAS project, an Android app plus `google-services.json` in the Firebase project, the FCM V1 service-account key uploaded to EAS, and a development build (Expo Go can't receive remote push notifications on Android).
 
 ## Troubleshooting
 
-- **"Offline · showing saved messages" never goes away:** The backend is unreachable. Open `https://messenger-yzgf.onrender.com/messages` in a browser. If it says the service is suspended, the server needs to be resumed or `API_URL` pointed at another one.
-- **No messages appear:** Confirm that `GET /messages` returns a JSON array.
-- **Messages cannot be sent:** Check the backend's `POST /messages` endpoint and verify that it accepts the `user` and `text` fields.
-- **The app cannot connect on a device:** Make sure the device has internet access. If using a local API instead, replace `API_URL` in `src/api.js` with an address reachable from the device (not `localhost`).
-- **First load is slow:** The hosted backend sleeps when idle and can take up to a minute to wake up; the app shows a notice while it waits.
-- **Start fresh:** Clear the app's data (or delete Expo Go's data) to remove the saved name, theme, cache and read position.
+- **"Setup needed" in the chat:** The message says which Firebase step is missing (config, Anonymous sign-in or rules). See [Firebase setup](#firebase-setup).
+- **"Offline · showing saved messages" never goes away:** The device can't reach Firestore. Check its internet connection and tap **Retry now**.
+- **Messages show *Not sent*:** Firestore rejected the write. Make sure the rules from `firestore.rules` are published and the display name is 1–40 characters.
+- **Start fresh:** Clear the app's data (or delete Expo Go's data) to remove the saved name, theme, cache and read position. The next launch signs in as a new anonymous user.
 - **iOS build issues:** Run CocoaPods installation from `messenger-starter/ios` if required by the native build setup.
 
 ## License

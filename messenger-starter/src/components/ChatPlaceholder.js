@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useThemedStyles } from '../theme';
 
-// The free backend host can take a while to wake up after being idle.
+// After this long, hint that the connection may be the problem.
 const SLOW_LOAD_MS = 4000;
 
-export default function ChatPlaceholder({ loading, groupName }) {
+export default function ChatPlaceholder({ loading, problem, groupName }) {
   const { styles, colors } = useThemedStyles(makeStyles);
   const [slow, setSlow] = useState(false);
 
@@ -22,9 +22,19 @@ export default function ChatPlaceholder({ loading, groupName }) {
         <Text style={styles.title}>Loading messages…</Text>
         {slow && (
           <Text style={styles.body}>
-            Waking up the server. This can take up to a minute.
+            Still connecting. Check your internet connection.
           </Text>
         )}
+      </View>
+    );
+  }
+
+  if (problem) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.emoji}>🛠️</Text>
+        <Text style={styles.title}>Setup needed</Text>
+        <Text style={styles.body}>{problem}</Text>
       </View>
     );
   }

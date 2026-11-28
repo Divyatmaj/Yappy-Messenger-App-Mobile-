@@ -13,7 +13,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Avatar from '../components/Avatar';
-import { fetchMessages } from '../api';
+import { fetchRecentMessages } from '../api';
 import { useThemedStyles, radius } from '../theme';
 
 const MIN_LENGTH = 2;
@@ -40,7 +40,7 @@ export default function WelcomeScreen({ initialName = '', onJoin }) {
   // Offer people who already posted as one-tap suggestions.
   useEffect(() => {
     let cancelled = false;
-    fetchMessages()
+    fetchRecentMessages()
       .then((messages) => {
         if (cancelled) return;
         const seen = [];
