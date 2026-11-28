@@ -25,9 +25,13 @@ import MessageBubble from '../components/MessageBubble';
 import NewMessagesDivider from '../components/NewMessagesDivider';
 import SearchBar from '../components/SearchBar';
 import Toast from '../components/Toast';
+import { chatTitle } from '../chats';
+import { useChat } from '../hooks/useChats';
 import useIncomingMessages from '../hooks/useIncomingMessages';
 import useMessages from '../hooks/useMessages';
 import useReadState from '../hooks/useReadState';
+import { useUsers } from '../hooks/useUsers';
+import { useSession } from '../session';
 import { messageKey } from '../api';
 import {
   longPressFeedback,
@@ -43,7 +47,6 @@ import {
 import { mentionsUser } from '../utils/richText';
 import { useThemedStyles } from '../theme';
 
-const GROUP_NAME = 'Scalar';
 // How close (in px) to the bottom still counts as "reading the latest".
 const NEAR_BOTTOM_PX = 80;
 // How long a message stays outlined after jumping to it from a reply.
@@ -53,6 +56,9 @@ const INCOMING_TOAST_MS = 3500;
 
 let toastCounter = 0;
 
+// Who sent a message: by uid, or by name for older messages without one.
+const senderOf = (message) => message?.uid ?? message?.user;
+
 function matchesQuery(message, q) {
   return (
     (message.text ?? '').toLowerCase().includes(q) ||
@@ -60,8 +66,17 @@ function matchesQuery(message, q) {
   );
 }
 
-export default function ChatScreen({ me, onChangeName }) {
+export default function ChatScreen({ chatId, initialChat, onBack }) {
   const { styles, colors } = useThemedStyles(makeStyles);
+  const { me, uid, changeName } = useSession();
+  const { usersById } = useUsers();
+  const chat = useChat(chatId, initialChat);
+  const title = chatTitle(chat, uid, usersById);
+  const isGroup = chat?.type !== 'direct';
+  const isMine = useCallback(
+    (message) => (message.uid ? message.uid === uid : message.user === me),
+    [uid, me],
+  );
   const {
     messages,
     loaded,
@@ -72,14 +87,14 @@ export default function ChatScreen({ me, onChangeName }) {
     retry,
     discard,
     refresh,
-  } = useMessages(me);
+  } = useMessages(chatId, me, uid);
   const {
     dividerKey,
     unreadAtOpen,
     ready: readReady,
     markRead,
     clearDivider,
-  } = useReadState(messages, me, loaded);
+  } = useReadState(messages, isMine, loaded, chatId);
   const [text, setText] = useState('');
   const [infoOpen, setInfoOpen] = useState(false);
   const [replyTo, setReplyTo] = useState(null);
@@ -259,10 +274,10 @@ export default function ChatScreen({ me, onChangeName }) {
     } else {
       const fromOthers = messages
         .slice(-added)
-        .filter((m) => m.user !== me).length;
+        .filter((m) => !isMine(m)).length;
       setUnread((n) => n + fromOthers);
     }
-  }, [messages, me, searching, scrollToLatest, readReady, markRead]);
+  }, [messages, isMine, searching, scrollToLatest, readReady, markRead]);
 
   const jumpToLatest = useCallback(() => {
     setUnread(0);
@@ -320,7 +335,7 @@ export default function ChatScreen({ me, onChangeName }) {
 
   // ---- In-app alerts for new messages -------------------------------------
   // Shown only when the new message isn't already on screen.
-  useIncomingMessages(messages, me, readReady, (fresh) => {
+  useIncomingMessages(messages, isMine, readReady, (fresh) => {
     if (nearBottom.current && !searching) return;
 
     const mention = [...fresh]
@@ -374,16 +389,21 @@ export default function ChatScreen({ me, onChangeName }) {
     }, 120);
   };
 
-  // Everyone who has posted, most recently active first. Used for member
-  // counts, @mention highlighting and composer suggestions.
+  // Names for @mention highlighting and suggestions: recent senders first,
+  // then the other members of the chat.
+  const memberIds = chat?.members ?? [];
   const members = useMemo(() => {
     const seen = new Set();
     for (let i = messages.length - 1; i >= 0; i--) {
       const user = messages[i].user?.trim();
       if (user) seen.add(user);
     }
+    for (const id of memberIds) {
+      const name = usersById.get(id);
+      if (name) seen.add(name);
+    }
     return [...seen];
-  }, [messages]);
+  }, [messages, memberIds, usersById]);
 
   const renderItem = ({ item, index }) => {
     const prev = messages[index - 1];
@@ -402,9 +422,13 @@ export default function ChatScreen({ me, onChangeName }) {
           message={item}
           me={me}
           members={members}
-          isMine={item.user === me}
-          isFirstInGroup={showDivider || !prev || prev.user !== item.user}
-          isLastInGroup={dividerBelow || !next || next.user !== item.user}
+          isMine={isMine(item)}
+          isFirstInGroup={
+            showDivider || !prev || senderOf(prev) !== senderOf(item)
+          }
+          isLastInGroup={
+            dividerBelow || !next || senderOf(next) !== senderOf(item)
+          }
           onRetry={() => retry(item.localId)}
           onDiscard={() => discard(item.localId)}
           onLongPress={() => openActions(item)}
@@ -436,13 +460,17 @@ export default function ChatScreen({ me, onChangeName }) {
           />
         ) : (
           <ChatHeader
-            title={GROUP_NAME}
+            title={title}
+            isGroup={isGroup}
+            onBack={onBack}
             subtitle={
               fromCache && online
                 ? 'Updating…'
-                : `${members.length || 'No'} member${
-                    members.length === 1 ? '' : 's'
-                  } · Group conversation`
+                : isGroup
+                  ? `${memberIds.length || 'No'} member${
+                      memberIds.length === 1 ? '' : 's'
+                    } · Group`
+                  : 'Direct message'
             }
             onSearchPress={() => setSearching(true)}
             onMenuPress={() => setInfoOpen(true)}
@@ -483,7 +511,7 @@ export default function ChatScreen({ me, onChangeName }) {
               <ChatPlaceholder
                 loading={!loaded && !problem}
                 problem={problem}
-                groupName={GROUP_NAME}
+                groupName={title}
               />
             }
             contentContainerStyle={styles.messagesContent}
@@ -511,9 +539,9 @@ export default function ChatScreen({ me, onChangeName }) {
             value={text}
             onChangeText={setText}
             onSend={sendMessage}
-            placeholder={`Message ${GROUP_NAME}...`}
+            placeholder={`Message ${title}...`}
             me={me}
-            onChangeName={onChangeName}
+            onChangeName={changeName}
             replyTo={replyTo}
             onCancelReply={() => setReplyTo(null)}
             inputRef={inputRef}
@@ -531,10 +559,12 @@ export default function ChatScreen({ me, onChangeName }) {
       <GroupInfoSheet
         visible={infoOpen}
         onClose={() => setInfoOpen(false)}
-        groupName={GROUP_NAME}
+        title={title}
+        isGroup={isGroup}
+        memberIds={memberIds}
+        usersById={usersById}
         messages={messages}
-        me={me}
-        onChangeName={onChangeName}
+        uid={uid}
       />
     </SafeAreaView>
   );

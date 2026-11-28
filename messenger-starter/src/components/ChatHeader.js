@@ -1,26 +1,52 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Avatar from './Avatar';
 import { useThemedStyles } from '../theme';
 
 export default function ChatHeader({
   title,
   subtitle,
+  isGroup = true,
+  onBack,
   onSearchPress,
   onMenuPress,
 }) {
   const { styles } = useThemedStyles(makeStyles);
   return (
     <View style={styles.header}>
-      <View style={styles.icon}>
-        <Text style={styles.iconText}>{title.charAt(0).toUpperCase()}</Text>
-      </View>
+      {onBack && (
+        <Pressable
+          style={({ pressed }) => [styles.back, pressed && styles.pressed]}
+          onPress={onBack}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Back to chats"
+        >
+          <Text style={styles.backText}>‹</Text>
+        </Pressable>
+      )}
 
-      <View style={styles.info}>
-        <Text style={styles.title}>{title}</Text>
-        <View style={styles.statusRow}>
-          <View style={styles.onlineDot} />
-          <Text style={styles.statusText}>{subtitle}</Text>
+      <Pressable
+        style={styles.identity}
+        onPress={onMenuPress}
+        accessibilityRole="button"
+        accessibilityLabel={`${title} info`}
+      >
+        <View style={styles.icon}>
+          <Avatar name={title} size={42} group={isGroup} />
         </View>
-      </View>
+
+        <View style={styles.info}>
+          <Text style={styles.title} numberOfLines={1}>
+            {title}
+          </Text>
+          <View style={styles.statusRow}>
+            <View style={styles.onlineDot} />
+            <Text style={styles.statusText} numberOfLines={1}>
+              {subtitle}
+            </Text>
+          </View>
+        </View>
+      </Pressable>
 
       <Pressable
         style={({ pressed }) => [styles.action, pressed && styles.pressed]}
@@ -49,7 +75,8 @@ const makeStyles = (colors) =>
   StyleSheet.create({
     header: {
       backgroundColor: colors.header,
-      paddingHorizontal: 20,
+      paddingLeft: 8,
+      paddingRight: 14,
       paddingVertical: 16,
       flexDirection: 'row',
       alignItems: 'center',
@@ -60,25 +87,33 @@ const makeStyles = (colors) =>
       shadowOffset: { width: 0, height: 2 },
       zIndex: 1,
     },
-    icon: {
-      width: 46,
-      height: 46,
-      borderRadius: 16,
-      backgroundColor: colors.primary,
+    back: {
+      width: 36,
+      height: 40,
+      borderRadius: 18,
       alignItems: 'center',
       justifyContent: 'center',
-      marginRight: 13,
     },
-    iconText: {
-      fontSize: 23,
-      fontWeight: 'bold',
+    backText: {
       color: colors.onPrimary,
+      fontSize: 34,
+      lineHeight: 38,
+      marginTop: -4,
+    },
+    identity: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginLeft: 4,
+    },
+    icon: {
+      marginRight: 11,
     },
     info: {
       flex: 1,
     },
     title: {
-      fontSize: 21,
+      fontSize: 19,
       fontWeight: 'bold',
       color: colors.onPrimary,
       letterSpacing: 0.4,

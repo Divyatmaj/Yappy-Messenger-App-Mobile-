@@ -8,9 +8,16 @@ const PREFIX = '@yappy/';
 export const KEYS = {
   displayName: 'displayName',
   themeMode: 'themeMode',
+  // Per chat: use chatKey(KEYS.messageCache, chatId) etc.
   messageCache: 'messageCache',
   lastRead: 'lastRead',
+  // { [chatId]: millis of the newest message you've seen }
+  readMarks: 'readMarks',
+  chatList: 'chatList',
 };
+
+/** Storage key for a per-chat value, e.g. chatKey(KEYS.lastRead, id). */
+export const chatKey = (base, chatId) => `${base}/${chatId}`;
 
 /** Reads a JSON value, returning `fallback` when missing or unreadable. */
 export async function load(key, fallback = null) {

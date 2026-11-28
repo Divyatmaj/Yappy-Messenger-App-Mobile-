@@ -8,36 +8,136 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function me() {
+      return request.auth.uid;
+    }
+
     function validName(name) {
       return name is string && name.size() >= 1 && name.size() <= 40;
     }
 
-    // Chat messages: anyone in the app can read and post; nobody can edit
-    // or delete. The timestamp must come from the server.
-    match /messages/{messageId} {
-      allow read: if signedIn();
-      allow create: if signedIn()
-        && request.resource.data.keys().hasAll(['user', 'text', 'uid', 'createdAt'])
-        && request.resource.data.keys().hasOnly(['user', 'text', 'uid', 'createdAt'])
-        && validName(request.resource.data.user)
-        && request.resource.data.text is string
-        && request.resource.data.text.size() >= 1
-        && request.resource.data.text.size() <= 2200
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.createdAt == request.time;
-      allow update, delete: if false;
+    // Fields changed by an update.
+    function changed() {
+      return request.resource.data.diff(resource.data).affectedKeys();
     }
 
-    // Push notification devices; the document id is the Expo push token.
+    // ---- People directory ---------------------------------------------------
+    // users/{uid}: { name, nameLower, updatedAt }. Everyone can see the list;
+    // you can only edit your own profile.
+    match /users/{userId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && userId == me()
+        && request.resource.data.keys().hasOnly(['name', 'nameLower', 'updatedAt'])
+        && validName(request.resource.data.name)
+        && request.resource.data.nameLower == request.resource.data.name.lower();
+      allow delete: if false;
+    }
+
+    // ---- Chats --------------------------------------------------------------
+    // chats/{chatId}: { type: 'group' | 'direct', name?, members: [uid],
+    //   public?, createdBy, createdAt, updatedAt, lastMessage? }
+    match /chats/{chatId} {
+      function isMember() {
+        return me() in resource.data.members;
+      }
+
+      function newChat() {
+        return request.resource.data;
+      }
+
+      // Members can read their chats; anyone can see public groups (and
+      // check whether a chat exists before creating it).
+      allow read: if signedIn() && (
+        resource == null
+        || resource.data.get('public', false) == true
+        || isMember()
+      );
+
+      allow create: if signedIn()
+        && newChat().keys().hasOnly(['type', 'name', 'members', 'public', 'createdBy', 'createdAt', 'updatedAt'])
+        && newChat().createdBy == me()
+        && newChat().createdAt == request.time
+        && newChat().members is list
+        && me() in newChat().members
+        && newChat().members.size() >= 1
+        && newChat().members.size() <= 50
+        && (
+          // A group. Only the built-in "scalar" group may be public.
+          (newChat().type == 'group'
+            && validName(newChat().name)
+            && (newChat().get('public', false) == false || chatId == 'scalar'))
+          ||
+          // A one-to-one chat. Its id is fixed by the two (sorted) uids, so
+          // there is only ever one chat per pair.
+          (newChat().type == 'direct'
+            && newChat().members.size() == 2
+            && newChat().get('public', false) == false
+            && chatId == 'dm_' + newChat().members[0] + '_' + newChat().members[1])
+        );
+
+      allow update: if signedIn() && (
+        // Sending a message: update the last-message preview.
+        (isMember()
+          && changed().hasOnly(['lastMessage', 'updatedAt'])
+          && request.resource.data.lastMessage.uid == me()
+          && request.resource.data.lastMessage.createdAt == request.time
+          && request.resource.data.updatedAt == request.time)
+        ||
+        // Joining a public group: add only yourself.
+        (resource.data.get('public', false) == true
+          && changed().hasOnly(['members'])
+          && request.resource.data.members.hasAll(resource.data.members)
+          && request.resource.data.members.size() == resource.data.members.size() + 1
+          && me() in request.resource.data.members)
+        ||
+        // Managing a private group you're in: rename it, add or remove
+        // members, or leave it.
+        (isMember()
+          && resource.data.type == 'group'
+          && resource.data.get('public', false) == false
+          && changed().hasOnly(['name', 'members', 'updatedAt'])
+          && validName(request.resource.data.name)
+          && request.resource.data.members.size() <= 50)
+      );
+
+      allow delete: if false;
+
+      // chats/{chatId}/messages/{id}: { user, text, uid, createdAt }.
+      // Only members can read and post; nobody can edit or delete.
+      match /messages/{messageId} {
+        function isChatMember() {
+          return me() in get(/databases/$(database)/documents/chats/$(chatId)).data.members;
+        }
+
+        allow read: if signedIn() && isChatMember();
+        allow create: if signedIn()
+          && isChatMember()
+          && request.resource.data.keys().hasAll(['user', 'text', 'uid', 'createdAt'])
+          && request.resource.data.keys().hasOnly(['user', 'text', 'uid', 'createdAt'])
+          && validName(request.resource.data.user)
+          && request.resource.data.text is string
+          && request.resource.data.text.size() >= 1
+          && request.resource.data.text.size() <= 2200
+          && request.resource.data.uid == me()
+          && request.resource.data.createdAt == request.time;
+        allow update, delete: if false;
+      }
+    }
+
+    // ---- Push notification devices -------------------------------------------
+    // devices/{token}: { token, uid, user, mode, muted?, platform?, updatedAt? }
+    // The document id is the device's Expo push token.
     match /devices/{token} {
       allow read: if signedIn();
       allow create, update: if signedIn()
         && request.resource.data.keys().hasAll(['token', 'user', 'mode', 'uid'])
-        && request.resource.data.keys().hasOnly(['token', 'user', 'mode', 'platform', 'uid', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['token', 'user', 'mode', 'muted', 'platform', 'uid', 'updatedAt'])
         && request.resource.data.token == token
         && validName(request.resource.data.user)
         && request.resource.data.mode in ['all', 'mentions', 'off']
-        && request.resource.data.uid == request.auth.uid;
+        && request.resource.data.get('muted', []) is list
+        && request.resource.data.uid == me();
       // Any client may delete, so senders can remove tokens that Expo
       // reports as no longer registered.
       allow delete: if signedIn();

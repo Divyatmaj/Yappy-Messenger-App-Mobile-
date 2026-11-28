@@ -1,12 +1,14 @@
 # Yappy Messenger
 
-A group messaging mobile app built with Expo, React Native and Firebase. Pick a display name, join the Scalar group conversation, and chat in real time with a polished light or dark UI.
+A group messaging mobile app built with Expo, React Native and Firebase. Pick a display name and chat in real time in multiple conversations, starting with the public Scalar group, in a polished light or dark UI.
 
 ## Features
 
 ### Chatting
 
-- **Welcome screen** – choose a display name (2–20 characters) or continue as a recent participant; change it any time
+- **Multiple chats** – a WhatsApp-style **Chats** home screen lists every conversation you're in, with the last message, time and an unread dot
+- **Public group** – everyone automatically joins the **Scalar** group
+- **Welcome screen** – choose a display name (2–20 characters); change it any time from Settings
 - **Polished chat UI** – per-user avatar colors, grouped consecutive messages, auto-scroll to the latest message
 - **Optimistic sending** – messages appear instantly with a *Sending…* state; failed sends can be retried or deleted
 - **Message actions** – long-press any message to reply or copy it (failed messages also offer retry/delete), with haptic feedback
@@ -26,9 +28,9 @@ A group messaging mobile app built with Expo, React Native and Firebase. Pick a 
 
 ### Personalization & device
 
-- **Remembers you** – your display name, theme choice and the latest 200 messages are saved on the device, so the app opens straight into the chat and shows saved messages even when offline
-- **Dark mode** – follow the system theme or force light/dark from the group info sheet
-- **Group info** – member list ranked by message count, plus group stats
+- **Remembers you** – your display name, theme, chat list and the latest 200 messages of each chat are saved on the device, so the app opens instantly and works offline
+- **Dark mode** – follow the system theme or force light/dark from Settings (⚙︎ on the Chats screen)
+- **Chat info** – tap the chat header to see the members, ranked by message count, plus stats
 - **Battery friendly** – the Firestore listener pauses while the app is in the background and resumes as soon as you return
 - Keyboard-aware, safe-area-aware layout on iOS and Android
 
@@ -52,35 +54,43 @@ Messenger/
 ├── README.md
 ├── firestore.rules                    # Firestore security rules (paste into the console)
 └── messenger-starter/
-    ├── App.js                         # Root: restores saved name/theme, welcome/chat switch
+    ├── App.js                         # Root: name, sign-in, profile, Chats ⇄ Chat navigation
     ├── app.json                       # Expo config (name, bundle IDs, deep-link scheme)
     ├── index.js                       # Expo entry point
     ├── package.json                   # Dependencies and scripts
     └── src/
-        ├── api.js                     # Firestore: subscribe to, read and post messages
+        ├── api.js                     # Firestore: a chat's messages (subscribe, post)
+        ├── chats.js                   # Firestore: users directory, chats, public group
         ├── firebase.js                # Firebase app, anonymous auth, Firestore, error hints
         ├── firebaseConfig.js          # Your Firebase web app config (paste here)
         ├── haptics.js                 # Safe haptic feedback helpers
+        ├── readMarks.js               # Per-chat "last seen" times for unread dots
+        ├── session.js                 # Current user (name + uid) context
         ├── storage.js                 # AsyncStorage wrapper and persisted keys
         ├── theme.js                   # Light/dark palettes, ThemeProvider, avatar colors
         ├── hooks/
         │   ├── useAppActive.js        # Foreground/background state
+        │   ├── useChats.js            # Your chat list and a single chat, live
         │   ├── useIncomingMessages.js # Detects newly arrived messages from others
         │   ├── useMessages.js         # Real-time listener, cache, optimistic send, retry, connection state
-        │   └── useReadState.js        # Last-read position and New messages divider
+        │   ├── useReadState.js        # Last-read position and New messages divider
+        │   └── useUsers.js            # People directory provider
         ├── screens/
-        │   ├── ChatScreen.js          # Conversation, search, scrolling, actions, alerts
+        │   ├── ChatScreen.js          # One conversation: search, scrolling, actions, alerts
+        │   ├── ChatsScreen.js         # Home: list of your chats
         │   └── WelcomeScreen.js       # Display-name picker
         ├── utils/
         │   ├── reply.js               # Encode/parse quoted replies
-        │   └── richText.js            # Links, @mentions, emoji-only detection
+        │   ├── richText.js            # Links, @mentions, emoji-only detection
+        │   └── time.js                # Chat-list time formatting
         └── components/
             ├── Avatar.js
-            ├── ChatHeader.js
+            ├── ChatHeader.js          # Back button, chat avatar, title
+            ├── ChatListItem.js        # One row of the chat list
             ├── ChatPlaceholder.js     # Loading / empty states
             ├── Composer.js            # Message input, reply bar, mention suggestions
             ├── ConnectionBanner.js    # Offline notice
-            ├── GroupInfoSheet.js      # Members, stats, theme switcher
+            ├── GroupInfoSheet.js      # Chat members and stats
             ├── HighlightedText.js     # Search-match highlighting
             ├── JumpToLatestButton.js
             ├── MentionSuggestions.js  # @mention autocomplete list
@@ -89,6 +99,7 @@ Messenger/
             ├── NewMessagesDivider.js
             ├── RichText.js            # Links, mentions and search highlights
             ├── SearchBar.js
+            ├── SettingsSheet.js       # Profile, theme, change name
             └── Toast.js               # Floating notices and message alerts
 ```
 
@@ -132,20 +143,21 @@ Until steps 2–5 are done, the chat shows a *Setup needed* message saying what 
 
 ### Data model
 
-`messages/{autoId}`
+| Path | Fields |
+| --- | --- |
+| `users/{uid}` | `name`, `nameLower`, `updatedAt`: the people directory |
+| `chats/{chatId}` | `type` (`group` / `direct`), `name` (groups), `members` (uids), `public`, `createdBy`, `createdAt`, `updatedAt`, `lastMessage` (`text`, `user`, `uid`, `createdAt`) |
+| `chats/{chatId}/messages/{id}` | `user`, `text`, `uid`, `createdAt` |
+| `devices/{expoPushToken}` | push notification settings (next step) |
 
-```json
-{
-  "user": "Alex",
-  "text": "Hello!",
-  "uid": "<anonymous auth uid>",
-  "createdAt": "<server timestamp>"
-}
-```
+- The built-in public group has the id `scalar`. Every user joins it on first launch.
+- One-to-one chats have the id `dm_<uidA>_<uidB>` (uids sorted), so each pair of people has exactly one chat.
+- Sending writes the message and the chat's `lastMessage` in one atomic batch. That's what keeps the chat list up to date.
+- Your identity is the anonymous Firebase **uid** of the device. Messages are shown as yours by uid, and the display name is just a label.
 
-The app listens to the latest 200 messages ordered by `createdAt`. On the Spark plan, Firestore allows 50,000 document reads per day, and each app open reads up to 200, which is plenty for a class group.
+The app loads your chats plus the latest 200 messages of the open chat. On the Spark plan, Firestore allows 50,000 document reads per day, which is plenty for a class.
 
-The security rules allow signed-in clients to read and create messages with exactly these fields and a server timestamp. Messages can't be edited or deleted. The `devices` collection in the rules is used for push notifications.
+[`firestore.rules`](firestore.rules) only lets members read and post in a chat. Anyone can join the public group. Members can rename private groups, add or remove members, or leave. Messages can't be edited or deleted, and timestamps must come from the server. **After changing the rules file, paste it into the console again and click Publish.**
 
 ### Text conventions
 
@@ -165,22 +177,24 @@ Everything is stored with AsyncStorage under the `@yappy/` prefix (see `src/stor
 | --- | --- |
 | `displayName` | Your chosen display name |
 | `themeMode` | `system`, `light` or `dark` |
-| `messageCache` | The latest 200 messages, shown instantly on launch |
-| `lastRead` | The last message you've seen, used for the *New messages* divider |
+| `chatList` | Your chats, shown instantly on launch |
+| `messageCache/{chatId}` | The latest 200 messages of each chat you've opened |
+| `lastRead/{chatId}` | The last message you've seen in a chat, used for the *New messages* divider |
+| `readMarks` | Per chat, the time of the newest message you've seen, used for unread dots |
 
-Tapping **Change** next to your name, or using **Change display name** in group info, returns to the welcome screen. The saved name is replaced only when you join with a new one.
+Tapping **Change** next to your name, or **Change display name** in Settings, returns to the welcome screen. The saved name is replaced only when you join with a new one.
 
 ## How It Works
 
-1. On first launch you choose a display name on the welcome screen. Later launches go straight to the chat.
-2. Saved messages from the last session appear immediately. The chat screen then signs in anonymously and opens a real-time Firestore listener, which is paused while the app is in the background.
+1. On first launch you choose a display name on the welcome screen. The app signs in anonymously, saves your profile to the people directory and joins you to the Scalar group. Later launches go straight to the **Chats** list.
+2. Tap a chat to open it. Saved messages from the last visit appear immediately, then a real-time Firestore listener takes over. Listeners pause while the app is in the background.
 3. Sending adds the message locally right away (*Sending…*) and writes it to Firestore. Once the server confirms it, the local copy is replaced by the stored one. While offline, Firestore queues the write and sends it when the connection returns. If the write is rejected, the message is marked *Not sent* with **Retry** and **Delete** options.
-4. Messages whose `user` matches your display name appear on the right; others appear on the left with a sender name and colored avatar.
+4. Your messages (matched by uid) appear on the right; others appear on the left with a sender name and colored avatar.
 5. If you've scrolled up, new messages don't move the list; the jump-to-latest button shows how many arrived, and a tappable alert shows who sent them.
 6. Long-press a message to reply or copy it. Tap the quote in a reply to jump to the original message.
-7. Type `@` in the composer to mention someone who has posted in the group. Names can contain spaces; mentions are matched against known members, longest name first.
+7. Type `@` in the composer to mention a member of the chat. Names can contain spaces; mentions are matched against known members, longest name first.
 8. The app saves the last message you've seen. On your next visit, unread messages from others start below a *New messages* divider and the chat opens there.
-9. Tap 🔍 to search, or ••• for group info, members, the theme switcher and changing your name.
+9. In a chat, tap 🔍 to search or the header for chat info and members. On the Chats screen, ⚙︎ opens Settings (theme, display name). The Android back button returns to the chat list.
 
 ## Roadmap: push notifications
 

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { messageKey } from '../api';
-import { KEYS, load, save } from '../storage';
+import { markChatRead, loadReadMarks } from '../readMarks';
+import { chatKey, KEYS, load, save } from '../storage';
 
 /**
- * Remembers the last message you have seen, across launches.
+ * Remembers the last message you have seen in a chat, across launches.
  *
  * - `dividerKey`: key of the first unread message from someone else when
  *   the conversation was opened, used to draw a "New messages" divider.
@@ -17,7 +18,7 @@ import { KEYS, load, save } from '../storage';
  * The saved value is `{ key, count }`: the key finds the message again if
  * the server provides ids; the count is a fallback when it doesn't.
  */
-export default function useReadState(messages, me, loaded) {
+export default function useReadState(messages, isMine, loaded, chatId) {
   const [stored, setStored] = useState(undefined); // undefined = loading
   const [dividerKey, setDividerKey] = useState(null);
   const [unreadAtOpen, setUnreadAtOpen] = useState(0);
@@ -26,11 +27,12 @@ export default function useReadState(messages, me, loaded) {
   const lastSaved = useRef(null);
 
   useEffect(() => {
-    load(KEYS.lastRead).then((value) => {
+    loadReadMarks(); // so markRead can update the chat list's marks
+    load(chatKey(KEYS.lastRead, chatId)).then((value) => {
       lastSaved.current = value?.key ?? null;
       setStored(value ?? null);
     });
-  }, []);
+  }, [chatId]);
 
   const serverCount = messages.filter((m) => !m.localId).length;
 
@@ -56,7 +58,7 @@ export default function useReadState(messages, me, loaded) {
     let firstUnread = -1;
     let count = 0;
     for (let i = lastReadIndex + 1; i < serverCount; i++) {
-      if (messages[i].user === me) continue;
+      if (isMine(messages[i])) continue;
       if (firstUnread === -1) firstUnread = i;
       count++;
     }
@@ -64,7 +66,7 @@ export default function useReadState(messages, me, loaded) {
       setDividerKey(messageKey(messages[firstUnread], firstUnread));
       setUnreadAtOpen(count);
     }
-  }, [loaded, stored, messages, serverCount, me]);
+  }, [loaded, stored, messages, serverCount, isMine]);
 
   const markRead = useCallback(() => {
     if (!computed.current || serverCount === 0) return;
@@ -72,8 +74,9 @@ export default function useReadState(messages, me, loaded) {
     const key = messageKey(messages[index], index);
     if (key === lastSaved.current) return;
     lastSaved.current = key;
-    save(KEYS.lastRead, { key, count: serverCount });
-  }, [messages, serverCount]);
+    save(chatKey(KEYS.lastRead, chatId), { key, count: serverCount });
+    markChatRead(chatId, messages[index].createdAt);
+  }, [messages, serverCount, chatId]);
 
   const clearDivider = useCallback(() => setDividerKey(null), []);
 

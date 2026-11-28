@@ -1,9 +1,12 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { useThemedStyles, colorForUser } from '../theme';
 
-export default function Avatar({ name, size = 32 }) {
-  const { styles, isDark } = useThemedStyles(makeStyles);
-  const { bg, fg } = colorForUser(name, isDark);
+/** Colored initial for a person; `group` uses the app's primary color. */
+export default function Avatar({ name, size = 32, group = false }) {
+  const { styles, isDark, colors } = useThemedStyles(makeStyles);
+  const { bg, fg } = group
+    ? { bg: colors.primary, fg: colors.onPrimary }
+    : colorForUser(name, isDark);
   const initial = name?.trim().charAt(0).toUpperCase() || '?';
 
   return (

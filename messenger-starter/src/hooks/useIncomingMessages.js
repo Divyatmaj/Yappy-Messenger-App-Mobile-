@@ -9,7 +9,12 @@ import { messageKey } from '../api';
  * This is the single place that knows "something new arrived", so in-app
  * toasts today and local/push notification handling later can share it.
  */
-export default function useIncomingMessages(messages, me, ready, onIncoming) {
+export default function useIncomingMessages(
+  messages,
+  isMine,
+  ready,
+  onIncoming,
+) {
   const seen = useRef(null);
   const callback = useRef(onIncoming);
   callback.current = onIncoming;
@@ -25,9 +30,9 @@ export default function useIncomingMessages(messages, me, ready, onIncoming) {
       const key = messageKey(message, index);
       if (seen.current.has(key)) return;
       seen.current.add(key);
-      if (!isFirst && message.user !== me) fresh.push({ message, index });
+      if (!isFirst && !isMine(message)) fresh.push({ message, index });
     });
 
     if (fresh.length) callback.current(fresh);
-  }, [messages, me, ready]);
+  }, [messages, isMine, ready]);
 }

@@ -10,34 +10,42 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import Avatar from './Avatar';
-import { THEME_MODES, useThemedStyles } from '../theme';
+import { useThemedStyles } from '../theme';
 
-const MODE_LABELS = { system: 'System', light: 'Light', dark: 'Dark' };
-
+/**
+ * Details of the open chat: who is in it and how active they are.
+ * `memberIds` are uids; `usersById` maps uid → display name.
+ */
 export default function GroupInfoSheet({
   visible,
   onClose,
-  groupName,
+  title,
+  isGroup,
+  memberIds,
+  usersById,
   messages,
-  me,
-  onChangeName,
+  uid,
 }) {
-  const { styles, mode, setMode } = useThemedStyles(makeStyles);
+  const { styles } = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
 
-  // Members ranked by how many delivered messages they've sent.
+  // Members ranked by how many of the loaded messages they've sent.
   const members = useMemo(() => {
     const counts = new Map();
     for (const m of messages) {
-      if (m.localId || !m.user) continue;
-      counts.set(m.user, (counts.get(m.user) ?? 0) + 1);
+      if (m.localId || !m.uid) continue;
+      counts.set(m.uid, (counts.get(m.uid) ?? 0) + 1);
     }
-    return [...counts.entries()]
-      .map(([name, count]) => ({ name, count }))
+    return memberIds
+      .map((id) => ({
+        uid: id,
+        name: usersById.get(id) ?? 'Unknown user',
+        count: counts.get(id) ?? 0,
+      }))
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-  }, [messages]);
+  }, [messages, memberIds, usersById]);
 
-  const delivered = members.reduce((sum, m) => sum + m.count, 0);
+  const delivered = messages.filter((m) => !m.localId).length;
 
   return (
     <Modal
@@ -59,43 +67,18 @@ export default function GroupInfoSheet({
           <ScrollView showsVerticalScrollIndicator={false}>
             <View style={styles.hero}>
               <View style={styles.groupIcon}>
-                <Text style={styles.groupIconText}>
-                  {groupName.charAt(0).toUpperCase()}
-                </Text>
+                <Avatar name={title} size={64} group={isGroup} />
               </View>
-              <Text style={styles.groupName}>{groupName}</Text>
-              <Text style={styles.groupMeta}>Group conversation</Text>
+              <Text style={styles.groupName}>{title}</Text>
+              <Text style={styles.groupMeta}>
+                {isGroup ? 'Group conversation' : 'Direct message'}
+              </Text>
             </View>
 
             <View style={styles.stats}>
               <Stat styles={styles} value={members.length} label="Members" />
               <View style={styles.statDivider} />
               <Stat styles={styles} value={delivered} label="Messages" />
-            </View>
-
-            <Text style={styles.sectionLabel}>APPEARANCE</Text>
-            <View style={styles.segmented}>
-              {THEME_MODES.map((option) => {
-                const selected = option === mode;
-                return (
-                  <Pressable
-                    key={option}
-                    style={[styles.segment, selected && styles.segmentActive]}
-                    onPress={() => setMode(option)}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                  >
-                    <Text
-                      style={[
-                        styles.segmentText,
-                        selected && styles.segmentTextActive,
-                      ]}
-                    >
-                      {MODE_LABELS[option]}
-                    </Text>
-                  </Pressable>
-                );
-              })}
             </View>
 
             <Text style={styles.sectionLabel}>MEMBERS</Text>
@@ -105,7 +88,7 @@ export default function GroupInfoSheet({
               )}
               {members.map((member, i) => (
                 <View
-                  key={member.name}
+                  key={member.uid}
                   style={[styles.memberRow, i > 0 && styles.memberDivider]}
                 >
                   <Avatar name={member.name} size={36} />
@@ -114,7 +97,7 @@ export default function GroupInfoSheet({
                       <Text style={styles.memberName} numberOfLines={1}>
                         {member.name}
                       </Text>
-                      {member.name === me && (
+                      {member.uid === uid && (
                         <View style={styles.youBadge}>
                           <Text style={styles.youText}>You</Text>
                         </View>
@@ -127,19 +110,6 @@ export default function GroupInfoSheet({
                 </View>
               ))}
             </View>
-
-            <Pressable
-              style={({ pressed }) => [
-                styles.button,
-                pressed && styles.buttonPressed,
-              ]}
-              onPress={() => {
-                onClose();
-                onChangeName?.();
-              }}
-            >
-              <Text style={styles.buttonText}>Change display name</Text>
-            </Pressable>
 
             <Pressable onPress={onClose} style={styles.closeButton}>
               <Text style={styles.closeText}>Close</Text>
@@ -188,18 +158,7 @@ const makeStyles = (colors) =>
       marginBottom: 18,
     },
     groupIcon: {
-      width: 64,
-      height: 64,
-      borderRadius: 22,
-      backgroundColor: colors.primary,
-      alignItems: 'center',
-      justifyContent: 'center',
       marginBottom: 10,
-    },
-    groupIconText: {
-      color: colors.onPrimary,
-      fontSize: 30,
-      fontWeight: 'bold',
     },
     groupName: {
       color: colors.textStrong,
@@ -245,32 +204,6 @@ const makeStyles = (colors) =>
       letterSpacing: 1.5,
       marginBottom: 8,
       marginLeft: 4,
-    },
-    segmented: {
-      flexDirection: 'row',
-      backgroundColor: colors.surfaceMuted,
-      borderRadius: 14,
-      padding: 4,
-      marginBottom: 22,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    segment: {
-      flex: 1,
-      alignItems: 'center',
-      paddingVertical: 9,
-      borderRadius: 10,
-    },
-    segmentActive: {
-      backgroundColor: colors.primary,
-    },
-    segmentText: {
-      color: colors.text,
-      fontSize: 14,
-      fontWeight: '600',
-    },
-    segmentTextActive: {
-      color: colors.onPrimary,
     },
     card: {
       backgroundColor: colors.surface,
@@ -325,20 +258,6 @@ const makeStyles = (colors) =>
       color: colors.textMuted,
       fontSize: 12,
       marginTop: 2,
-    },
-    button: {
-      backgroundColor: colors.primary,
-      borderRadius: 25,
-      paddingVertical: 14,
-      alignItems: 'center',
-    },
-    buttonPressed: {
-      opacity: 0.85,
-    },
-    buttonText: {
-      color: colors.onPrimary,
-      fontSize: 15,
-      fontWeight: 'bold',
     },
     closeButton: {
       alignItems: 'center',

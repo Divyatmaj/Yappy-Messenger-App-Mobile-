@@ -6,12 +6,12 @@ import {
   isFirebaseConfigured,
 } from '../firebase';
 import useAppActive from './useAppActive';
-import { KEYS, load, save } from '../storage';
+import { chatKey, KEYS, load, save } from '../storage';
 
 let localIdCounter = 0;
 
 /**
- * Keeps the conversation in sync with Firestore in real time and sends
+ * Keeps one chat's messages in sync with Firestore in real time and sends
  * messages optimistically.
  *
  * `messages` merges server messages with local ones that are still
@@ -24,7 +24,7 @@ let localIdCounter = 0;
  * The listener is paused while the app is in the background and resumes
  * when it returns to the foreground.
  */
-export default function useMessages(me) {
+export default function useMessages(chatId, me, uid) {
   const [serverMessages, setServerMessages] = useState([]);
   const [pending, setPending] = useState([]);
   const [loaded, setLoaded] = useState(false);
@@ -42,13 +42,13 @@ export default function useMessages(me) {
 
   // Show the last saved conversation until the server answers.
   useEffect(() => {
-    load(KEYS.messageCache, []).then((cached) => {
+    load(chatKey(KEYS.messageCache, chatId), []).then((cached) => {
       if (gotServerData.current || !Array.isArray(cached)) return;
       if (cached.length === 0) return;
       setServerMessages(cached);
       setFromCache(true);
     });
-  }, []);
+  }, [chatId]);
 
   useEffect(() => {
     if (!appActive || !isFirebaseConfigured) return;
@@ -65,7 +65,7 @@ export default function useMessages(me) {
     ensureSignedIn()
       .then(() => {
         if (cancelled) return;
-        unsubscribe = subscribeMessages((messages, meta) => {
+        unsubscribe = subscribeMessages(chatId, (messages, meta) => {
           // Firestore first answers from its (empty) local cache; only a
           // server answer counts as loaded/online.
           if (meta.fromCache) {
@@ -78,7 +78,10 @@ export default function useMessages(me) {
           if (payload !== lastPayload.current) {
             lastPayload.current = payload;
             setServerMessages(messages);
-            save(KEYS.messageCache, messages.slice(-MESSAGE_LIMIT));
+            save(
+              chatKey(KEYS.messageCache, chatId),
+              messages.slice(-MESSAGE_LIMIT),
+            );
           }
           setFromCache(false);
           setLoaded(true);
@@ -92,7 +95,7 @@ export default function useMessages(me) {
       cancelled = true;
       unsubscribe?.();
     };
-  }, [appActive, attempt]);
+  }, [appActive, attempt, chatId]);
 
   const deliver = useCallback(
     async (localId, text) => {
@@ -102,7 +105,7 @@ export default function useMessages(me) {
         ),
       );
       try {
-        await postMessage(me, text);
+        await postMessage(chatId, me, text);
         // The listener delivers the stored copy at the same time.
         setPending((list) => list.filter((m) => m.localId !== localId));
       } catch (error) {
@@ -115,7 +118,7 @@ export default function useMessages(me) {
         );
       }
     },
-    [me],
+    [chatId, me],
   );
 
   const send = useCallback(
@@ -125,11 +128,11 @@ export default function useMessages(me) {
       const localId = `local-${++localIdCounter}`;
       setPending((list) => [
         ...list,
-        { localId, user: me, text, status: 'sending' },
+        { localId, uid, user: me, text, status: 'sending' },
       ]);
       deliver(localId, text);
     },
-    [me, deliver],
+    [me, uid, deliver],
   );
 
   const retry = useCallback(

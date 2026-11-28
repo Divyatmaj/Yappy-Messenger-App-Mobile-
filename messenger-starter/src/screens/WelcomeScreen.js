@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -13,12 +13,10 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Avatar from '../components/Avatar';
-import { fetchRecentMessages } from '../api';
 import { useThemedStyles, radius } from '../theme';
 
 const MIN_LENGTH = 2;
 const MAX_LENGTH = 20;
-const MAX_SUGGESTIONS = 6;
 
 export function validateName(raw) {
   const name = raw.trim();
@@ -35,27 +33,6 @@ export default function WelcomeScreen({ initialName = '', onJoin }) {
   const { styles, colors } = useThemedStyles(makeStyles);
   const [name, setName] = useState(initialName);
   const [touched, setTouched] = useState(false);
-  const [recentNames, setRecentNames] = useState([]);
-
-  // Offer people who already posted as one-tap suggestions.
-  useEffect(() => {
-    let cancelled = false;
-    fetchRecentMessages()
-      .then((messages) => {
-        if (cancelled) return;
-        const seen = [];
-        for (let i = messages.length - 1; i >= 0; i--) {
-          const user = messages[i].user?.trim();
-          if (user && !seen.includes(user)) seen.push(user);
-          if (seen.length >= MAX_SUGGESTIONS) break;
-        }
-        setRecentNames(seen);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const error = validateName(name);
   const showError = touched && error;
@@ -83,7 +60,7 @@ export default function WelcomeScreen({ initialName = '', onJoin }) {
             </View>
             <Text style={styles.title}>Yappy</Text>
             <Text style={styles.subtitle}>
-              Join the Scalar group and chat with your people.
+              Chat one-on-one or in groups with your people.
             </Text>
           </View>
 
@@ -123,28 +100,6 @@ export default function WelcomeScreen({ initialName = '', onJoin }) {
               <Text style={styles.buttonText}>Join chat</Text>
             </Pressable>
 
-            {recentNames.length > 0 && (
-              <View style={styles.recent}>
-                <Text style={styles.recentLabel}>OR CONTINUE AS</Text>
-                <View style={styles.chips}>
-                  {recentNames.map((user) => (
-                    <Pressable
-                      key={user}
-                      style={({ pressed }) => [
-                        styles.chip,
-                        pressed && styles.chipPressed,
-                      ]}
-                      onPress={() => join(user)}
-                    >
-                      <Avatar name={user} size={22} />
-                      <Text style={styles.chipText} numberOfLines={1}>
-                        {user}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
-            )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -254,44 +209,5 @@ const makeStyles = (colors) =>
       color: colors.onPrimary,
       fontSize: 16,
       fontWeight: 'bold',
-    },
-    recent: {
-      marginTop: 22,
-    },
-    recentLabel: {
-      color: colors.textMuted,
-      fontSize: 10,
-      fontWeight: 'bold',
-      letterSpacing: 2,
-      marginBottom: 10,
-      textAlign: 'center',
-    },
-    chips: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'center',
-      gap: 8,
-    },
-    chip: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      backgroundColor: colors.surfaceMuted,
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: colors.border,
-      paddingLeft: 5,
-      paddingRight: 12,
-      paddingVertical: 5,
-      maxWidth: 160,
-    },
-    chipPressed: {
-      backgroundColor: colors.border,
-    },
-    chipText: {
-      color: colors.textStrong,
-      fontSize: 13,
-      fontWeight: '600',
-      flexShrink: 1,
     },
   });
